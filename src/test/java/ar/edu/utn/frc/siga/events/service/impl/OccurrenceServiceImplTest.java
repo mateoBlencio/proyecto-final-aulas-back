@@ -293,6 +293,68 @@ class OccurrenceServiceImplTest {
         assertThat(captor.getValue()).extracting(Occurrence::getRoomSlot).containsExactly(3);
     }
 
+    private Occurrence occurrenceOf(Long id, Long eventId, LocalDate date) {
+        AcademicEvent event = EventTestData.recurringEvent(eventId, DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 31));
+        return EventTestData.occurrence(id, event, date, OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    @Test
+    @DisplayName("findVisibleSlotsByEvents: excluye desde la fecha de baja del evento suspendido (inclusive) y conserva las anteriores")
+    void findVisibleSlotsByEventsExcluyeDesdeLaBaja() {
+        LocalDate baja = LocalDate.of(2026, 5, 11);
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, baja.minusWeeks(1)), occurrenceOf(11L, 1L, baja.minusDays(1)),
+                        occurrenceOf(12L, 1L, baja), occurrenceOf(13L, 1L, baja.plusDays(1)),
+                        occurrenceOf(14L, 1L, baja.plusWeeks(1))));
+        when(suspendedEventRepository.findAllSuspendedFrom()).thenReturn(java.util.Map.of(1L, baja));
+
+        var slots = service.findVisibleSlotsByEvents(java.util.Set.of(1L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(10L, 11L);
+    }
+
+    @Test
+    @DisplayName("findVisibleSlotsByEvents: la baja de un evento no afecta a las ocurrencias de otro evento no suspendido")
+    void findVisibleSlotsByEventsConservaLosEventosNoSuspendidos() {
+        LocalDate baja = LocalDate.of(2026, 5, 11);
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L, 2L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, baja.plusWeeks(1)), occurrenceOf(20L, 2L, baja.plusWeeks(1))));
+        when(suspendedEventRepository.findAllSuspendedFrom()).thenReturn(java.util.Map.of(1L, baja));
+
+        var slots = service.findVisibleSlotsByEvents(java.util.Set.of(1L, 2L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(20L);
+    }
+
+    @Test
+    @DisplayName("findVisibleSlotsByEvents: sin eventos suspendidos devuelve todas las ocurrencias desde 'from'")
+    void findVisibleSlotsByEventsSinSuspendidos() {
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, from), occurrenceOf(11L, 1L, from.plusWeeks(1))));
+        when(suspendedEventRepository.findAllSuspendedFrom()).thenReturn(java.util.Map.of());
+
+        var slots = service.findVisibleSlotsByEvents(java.util.Set.of(1L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(10L, 11L);
+    }
+
+    @Test
+    @DisplayName("findSlotsByEvents con 'from' no filtra suspendidas: el filtro vive solo en findVisibleSlotsByEvents")
+    void findSlotsByEventsConFromNoFiltraSuspendidas() {
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, from.plusWeeks(10))));
+
+        var slots = service.findSlotsByEvents(java.util.Set.of(1L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(10L);
+        verify(suspendedEventRepository, never()).findAllSuspendedFrom();
+    }
+
     @Test
     @DisplayName("findSlot: ocurrencia inexistente → ResourceNotFoundException")
     void findSlotInexistente() {

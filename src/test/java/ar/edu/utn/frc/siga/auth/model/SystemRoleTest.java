@@ -52,6 +52,13 @@ class SystemRoleTest {
         assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.BUILDING_ACTIVITY_READ);
     }
 
+    @Test
+    @DisplayName("USER_READ es de SUBSECRETARIA y no de AUXILIAR_AULICO")
+    void userReadIsSubsecretariaOnly() {
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.USER_READ);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).doesNotContain(Permission.USER_READ);
+    }
+
     @ParameterizedTest(name = "{0} + {1} -> {2}")
     @CsvSource({
             "SUBSECRETARIA, GLOBAL, true",

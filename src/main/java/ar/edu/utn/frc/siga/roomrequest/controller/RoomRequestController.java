@@ -187,7 +187,7 @@ public class RoomRequestController {
     @Operation(summary = "Derivar un pedido de aula a un edificio",
                description = "Deja el pedido en la cola de un edificio para que su auxiliar áulico "
                        + "lo resuelva. Solo desde NEW, y solo a edificios activos, con auxiliar "
-                       + "áulico asignado y con al menos un aula libre que cumpla los requisitos.")
+                       + "áulico asignado.")
     public ResponseEntity<RoomRequestItemResponseDto> deriveItem(@PathVariable Long id,
                                                                   @Valid @RequestBody DeriveRoomRequestItemDto dto,
                                                                   Principal principal) {

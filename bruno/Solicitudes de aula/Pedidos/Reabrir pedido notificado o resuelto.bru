@@ -21,7 +21,7 @@ docs {
   AUXILIAR_AULICO (pedidos derivados a su edificio).
 
   Vuelve el pedido de `NOTIFIED` o `RESOLVED` a `IN_EVALUATION`. `reason` es obligatorio y
-  queda en `decisionReason`.
+  queda en `reopenReason`; `decisionReason` conserva el motivo de la última asignación parcial.
 
   Desde `NOTIFIED` en un cambio de aula (ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE,
   PARTIAL_EXAM_IN_CLASS): cada clase futura vuelve al aula original si está libre; si no, queda en la

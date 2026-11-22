@@ -277,7 +277,7 @@ class RoomRequestSuggestionServiceImplTest {
     }
 
     private static RoomRequestItemResponseDto response() {
-        return new RoomRequestItemResponseDto(ITEM_ID, 1, RoomRequestStatus.IN_EVALUATION, ACTOR, null, "motivo",
+        return new RoomRequestItemResponseDto(ITEM_ID, 1, RoomRequestStatus.IN_EVALUATION, ACTOR, null, "motivo", null,
                 List.of(), null, null, null, null, null, null, null, 1, false, false, null, false, null, null,
                 List.of(), null, List.of(), null, null, null, null, null, null, null, null, null, List.of(), null);
     }

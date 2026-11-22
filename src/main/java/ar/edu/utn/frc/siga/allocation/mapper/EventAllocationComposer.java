@@ -49,8 +49,12 @@ public class EventAllocationComposer {
 
         Set<Long> eventIds = uniqueEvents.stream().map(UniqueEventResponseDto::id)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Los espejos comparten eventId con la principal: se descartan para no duplicar la clave.
         Map<Long, OccurrenceSlotDto> slotByEventId = Maps.byId(
-                occurrenceService.findSlotsByEvents(eventIds), OccurrenceSlotDto::eventId);
+                occurrenceService.findSlotsByEvents(eventIds).stream()
+                        .filter(slot -> slot.mirrorOfOccurrenceId() == null)
+                        .toList(),
+                OccurrenceSlotDto::eventId);
 
         Set<Long> occurrenceIds = slotByEventId.values().stream().map(OccurrenceSlotDto::occurrenceId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));

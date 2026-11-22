@@ -2,10 +2,12 @@ package ar.edu.utn.frc.siga.ingest.source.impl;
 
 import ar.edu.utn.frc.siga.ingest.dto.RowDto;
 import ar.edu.utn.frc.siga.ingest.dto.ImportedRow;
+import ar.edu.utn.frc.siga.ingest.exception.InvalidFileFormatException;
 import ar.edu.utn.frc.siga.ingest.mapper.ExcelRowMapper;
 import ar.edu.utn.frc.siga.ingest.source.IngestSource;
 import ar.edu.utn.frc.siga.ingest.util.ExcelRows;
 import ar.edu.utn.frc.siga.ingest.validator.ExcelTemplateValidator;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -33,20 +35,23 @@ public class ExcelIngestSource implements IngestSource {
 
     @Override
     public ParsedContent parse(MultipartFile file) {
-        Workbook workbook = validator.validate(file);
-        Sheet sheet = workbook.getSheet(SHEET_NAME);
-        int year = validator.extractYear(sheet);
+        try (Workbook workbook = validator.validate(file)) {
+            Sheet sheet = workbook.getSheet(SHEET_NAME);
+            int year = validator.extractYear(sheet);
 
-        List<ImportedRow> rows = new ArrayList<>();
-        for (int rowIndex = FIRST_DATA_ROW_INDEX; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
-            Row row = sheet.getRow(rowIndex);
-            if (ExcelRows.isEmpty(row, COLUMN_COUNT)) break;
+            List<ImportedRow> rows = new ArrayList<>();
+            for (int rowIndex = FIRST_DATA_ROW_INDEX; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row row = sheet.getRow(rowIndex);
+                if (ExcelRows.isEmpty(row, COLUMN_COUNT)) break;
 
-            int rowNum = rowIndex + 1;
-            RowDto dto = rowMapper.map(row, rowNum);
-            rows.add(new ImportedRow(rowNum, dto));
+                int rowNum = rowIndex + 1;
+                RowDto dto = rowMapper.map(row, rowNum);
+                rows.add(new ImportedRow(rowNum, dto));
+            }
+
+            return new ParsedContent(rows, year);
+        } catch (IOException e) {
+            throw new InvalidFileFormatException("File is not a valid Excel file: " + e.getMessage());
         }
-
-        return new ParsedContent(rows, year);
     }
 }

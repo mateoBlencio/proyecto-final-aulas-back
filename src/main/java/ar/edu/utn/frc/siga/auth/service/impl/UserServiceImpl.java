@@ -15,6 +15,8 @@ import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
 import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Paging;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private static final int PAGE_SIZE = 15;
+    private static final int MAX_PASSWORD_BYTES = 72;
+    private static final Set<String> SORTABLE = Set.of("id", "email", "firstName", "lastName");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,6 +62,11 @@ public class UserServiceImpl implements UserService {
             log.warn("Alta de usuario rechazada: email '{}' ya existe", email);
             throw new UserDomainException("User email already exists: " + email);
         }
+        // BCrypt trunca en 72 bytes; @Size cuenta caracteres, y un caracter UTF-8 puede ocupar hasta 4 bytes
+        if (dto.password().getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+            log.warn("Alta de usuario rechazada: password supera {} bytes, email={}", MAX_PASSWORD_BYTES, email);
+            throw new UserDomainException("Password must not exceed " + MAX_PASSWORD_BYTES + " bytes in UTF-8");
+        }
 
         User user = User.builder()
                 .email(email)
@@ -80,10 +89,13 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @AuditOperation(value = "Cambio de habilitación de usuario", subject = "User")
-    public UserResponseDto setEnabled(Long id, boolean enabled) {
+    public UserResponseDto setEnabled(Long id, boolean enabled, String currentUserEmail) {
         log.debug("{} usuario: id={}", enabled ? "Habilitando" : "Inhabilitando", id);
         AuditOperations.describe(enabled ? "Habilitación de usuario" : "Inhabilitación de usuario");
         User user = findExisting(id);
+        if (!enabled) {
+            requireDisableAllowed(user, currentUserEmail);
+        }
         user.setEnabled(enabled);
         User saved = userRepository.save(user);
 
@@ -140,13 +152,21 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean hasGlobalRole(String email, SystemRole role) {
-        return userRepository.existsEnabledGlobalRoleForUser(AuthDomainProperties.normalizeEmail(email), role);
-    }
-
-    @Override
     public Set<Long> findBuildingIdsForRole(String email, SystemRole role) {
         return userRepository.findBuildingIdsForUserAndRole(AuthDomainProperties.normalizeEmail(email), role);
+    }
+
+    // AUTH-RN-06: nadie se inhabilita a sí mismo ni deja al sistema sin subsecretaria habilitada
+    private void requireDisableAllowed(User target, String currentUserEmail) {
+        if (target.getEmail().equals(AuthDomainProperties.normalizeEmail(currentUserEmail))) {
+            log.warn("Inhabilitación rechazada: el usuario no puede inhabilitarse a sí mismo, id={}", target.getId());
+            throw new UserDomainException("Users cannot disable themselves");
+        }
+        List<User> subsecretarias = userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA);
+        if (subsecretarias.size() == 1 && subsecretarias.getFirst().getId().equals(target.getId())) {
+            log.warn("Inhabilitación rechazada: última subsecretaria habilitada, id={}", target.getId());
+            throw new UserDomainException("The last enabled SUBSECRETARIA cannot be disabled");
+        }
     }
 
     private User findExisting(Long id) {
@@ -158,6 +178,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private Pageable fixedSize(Pageable pageable) {
+        Paging.requireSortable(pageable.getSort(), SORTABLE);
         return PageRequest.of(pageable.getPageNumber(), PAGE_SIZE, pageable.getSort());
     }
 

@@ -153,7 +153,7 @@ public class PreviewServiceImpl implements PreviewService {
             log.info("Confirm sin ocurrencias pendientes: previewId={}, skipped={}", previewId, skippedEventIds.size());
             return new ConfirmPreviewResponseDto(List.of(), skippedEventIds);
         }
-        previewValidator.validateNoSiblingRoomClash(candidates);
+        validator.validateNoSiblingRoomClash(candidates);
         validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
         List<AllocationResponseDto> saved = allocationService.reallocate(AllocationCommand.automatic(items));

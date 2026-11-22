@@ -57,15 +57,17 @@ public class CommissionSyncService implements SysacadViewSyncer {
 
     private static CommissionSyncCommand toCommand(SysacadCommissionDto row,
             Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments) {
-        SysacadSubjectCommissionDto enrollment = enrollments.get(new EnrollmentKey(row.courseCode(), row.subjectCode()));
+        SysacadSubjectCommissionDto enrollment = enrollments.get(new EnrollmentKey(
+                row.courseCode(), row.subjectCode(), row.specialtyCode(), row.studyPlanCode()));
         Integer enrolledCount = enrollment == null ? null : enrollment.enrolledCount();
         return new CommissionSyncCommand(row.courseCode(), row.specialtyCode(), row.studyPlanCode(),
                 row.subjectCode(), row.academicYear(), enrolledCount);
     }
 
-    private record EnrollmentKey(String courseCode, Integer subjectCode) {
+    private record EnrollmentKey(String courseCode, Integer subjectCode, Integer specialtyCode,
+            Integer studyPlanCode) {
         static EnrollmentKey of(SysacadSubjectCommissionDto dto) {
-            return new EnrollmentKey(dto.courseCode(), dto.subjectCode());
+            return new EnrollmentKey(dto.courseCode(), dto.subjectCode(), dto.specialtyCode(), dto.studyPlanCode());
         }
     }
 }

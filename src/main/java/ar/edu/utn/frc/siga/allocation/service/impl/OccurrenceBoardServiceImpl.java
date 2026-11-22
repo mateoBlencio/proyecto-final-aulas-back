@@ -141,7 +141,7 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
                         .findEventIdsWithUnallocatedOccurrencesBetween(key.from(), key.to())),
                 AcademicEventResponseDto::id);
         Set<Long> matchingEventIds = matching(eventById, key);
-        List<OccurrenceSlotDto> slots = shownOnBoard(occurrenceService.findSlotsByEvents(matchingEventIds, key.from()))
+        List<OccurrenceSlotDto> slots = shownOnBoard(occurrenceService.findVisibleSlotsByEvents(matchingEventIds, key.from()))
                 .stream()
                 .filter(o -> !o.date().isAfter(key.to()))
                 .toList();

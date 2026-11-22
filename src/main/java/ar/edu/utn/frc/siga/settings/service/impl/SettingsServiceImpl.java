@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,20 +77,49 @@ public class SettingsServiceImpl implements SettingsService {
     @Transactional
     @AuditOperation(value = "Modificación de configuración", subject = "Setting")
     public SettingResponseDto update(String key, String value) {
-        SettingKey settingKey = resolveKey(key);
-        String normalized = validator.validate(settingKey, value);
-        store.write(settingKey, normalized);
-        log.info("Configuración actualizada: clave={}, valor={}", settingKey.getKey(), normalized);
-        return mapper.toDto(settingKey, normalized);
+        return apply(List.of(new SettingUpdateItemDto(key, value))).getFirst();
     }
 
     @Override
     @Transactional
     @AuditOperation(value = "Modificación de configuraciones", subject = "Setting")
     public List<SettingResponseDto> updateBatch(List<SettingUpdateItemDto> items) {
-        return items.stream()
-                .map(item -> update(item.key(), item.value()))
+        return apply(items);
+    }
+
+    /** Valida todo el lote (incluida la ventana horaria) antes de escribir la primera clave. */
+    private List<SettingResponseDto> apply(List<SettingUpdateItemDto> items) {
+        List<Map.Entry<SettingKey, String>> validated = items.stream()
+                .map(item -> {
+                    SettingKey settingKey = resolveKey(item.key());
+                    return Map.entry(settingKey, validator.validate(settingKey, item.value()));
+                })
                 .toList();
+        Map<SettingKey, String> pending = new HashMap<>();
+        validated.forEach(entry -> pending.put(entry.getKey(), entry.getValue()));
+        validateEventHours(pending);
+
+        return validated.stream()
+                .map(entry -> {
+                    store.write(entry.getKey(), entry.getValue());
+                    log.info("Configuración actualizada: clave={}, valor={}", entry.getKey().getKey(), entry.getValue());
+                    return mapper.toDto(entry.getKey(), entry.getValue());
+                })
+                .toList();
+    }
+
+    private void validateEventHours(Map<SettingKey, String> pending) {
+        if (!pending.containsKey(SettingKey.EVENTS_HOURS_START) && !pending.containsKey(SettingKey.EVENTS_HOURS_END)) {
+            return;
+        }
+        validator.validateEventHours(
+                pendingOrCurrentTime(pending, SettingKey.EVENTS_HOURS_START),
+                pendingOrCurrentTime(pending, SettingKey.EVENTS_HOURS_END));
+    }
+
+    private LocalTime pendingOrCurrentTime(Map<SettingKey, String> pending, SettingKey key) {
+        String value = pending.get(key);
+        return value != null ? LocalTime.parse(value) : store.getTime(key);
     }
 
     private SettingKey resolveKey(String key) {

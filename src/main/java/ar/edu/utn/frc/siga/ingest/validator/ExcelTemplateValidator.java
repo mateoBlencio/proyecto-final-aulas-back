@@ -14,6 +14,7 @@ import org.apache.poi.EmptyFileException;
 import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -32,6 +33,7 @@ public class ExcelTemplateValidator {
         "Nombre de materia", "Cantidad de Cursado"
     );
 
+    private static final DataFormatter DATA_FORMATTER = new DataFormatter();
     private static final String SHEET_NAME = "Hoja1";
     private static final int HEADER_ROW_INDEX = 5;
     private static final int FIRST_DATA_ROW_INDEX = 6;
@@ -61,6 +63,24 @@ public class ExcelTemplateValidator {
             throw new InvalidFileFormatException("File is not a valid Excel file: " + e.getMessage());
         }
 
+        try {
+            requireValidTemplate(workbook);
+        } catch (RuntimeException e) {
+            closeQuietly(workbook);
+            throw e;
+        }
+        return workbook;
+    }
+
+    private void closeQuietly(Workbook workbook) {
+        try {
+            workbook.close();
+        } catch (IOException e) {
+            log.warn("No se pudo cerrar el Excel rechazado: {}", e.getMessage());
+        }
+    }
+
+    private void requireValidTemplate(Workbook workbook) {
         Sheet sheet = workbook.getSheet(SHEET_NAME);
         if (sheet == null) {
             log.warn("Hoja '{}' no encontrada", SHEET_NAME);
@@ -83,7 +103,7 @@ public class ExcelTemplateValidator {
 
         for (int i = 0; i < EXPECTED_COLUMN_COUNT; i++) {
             Cell cell = headerRow.getCell(i);
-            String actualValue = cell == null ? "" : cell.getStringCellValue().trim();
+            String actualValue = cell == null ? "" : DATA_FORMATTER.formatCellValue(cell).trim();
             String expectedValue = EXPECTED_HEADERS.get(i);
             if (!actualValue.equals(expectedValue)) {
                 log.warn("Encabezado no coincide en columna {}: se esperaba '{}', se encontró '{}'",
@@ -108,8 +128,6 @@ public class ExcelTemplateValidator {
             throw new InvalidFileFormatException("No data rows found. " +
                 "The file must contain at least one data row starting from row 7.");
         }
-
-        return workbook;
     }
 
     public int extractYear(Sheet sheet) {

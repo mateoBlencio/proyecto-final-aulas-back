@@ -104,6 +104,13 @@ public interface AllocationService {
     /** No revisa el alcance por edificio: la autorización la hace quien llama. */
     RestoreResult restoreClassrooms(RestoreCommand command);
 
+    /**
+     * Revalida las asignaciones de ocurrencias cuya fecha u horario ya cambió en esta transacción: mismo
+     * camino que la asignación manual (alcance, aulas hermanas, solape con margen y observación). Sin
+     * asignaciones no hace nada. Si hubo solapes tolerados, guarda la observación en esas asignaciones.
+     */
+    void revalidateRescheduled(Collection<Long> occurrenceIds, String observation);
+
     /** Usuario y operación de la última revisión de auditoría de la asignación de la ocurrencia. */
     Optional<AllocationLastRevisionDto> findLastRevision(Long occurrenceId);
 }

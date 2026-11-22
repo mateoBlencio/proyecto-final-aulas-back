@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
+import ar.edu.utn.frc.siga.events.event.UniqueEventRescheduled;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -33,14 +34,19 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.SyncGuard;
+import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
+import ar.edu.utn.frc.siga.events.exception.UniqueEventInUseException;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -81,6 +87,9 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final CommissionService commissionService;
     private final EventScheduleValidator eventScheduleValidator;
     private final RecurringEventReconciler recurringEventReconciler;
+    private final ApplicationEventPublisher eventPublisher;
+    private final OccurrenceAllocationQuery occurrenceAllocationQuery;
+    private final OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
 
     @Override
     @Transactional(readOnly = true)
@@ -150,7 +159,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         }
         LocalDate today = LocalDate.now();
         List<RecurringEvent> owned = events.stream()
-                .filter(e -> Boolean.TRUE.equals(e.getSysacadEnabled()) || e.getSysacadHash() == null)
+                .filter(e -> Boolean.TRUE.equals(e.getSigaEnabled()))
                 .toList();
         if (owned.isEmpty()) {
             return ScheduleStatus.DISABLED_IN_SYSACAD;
@@ -192,13 +201,16 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         log.debug("Creando evento recurrente: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
+        DateRanges.requireNotBefore(dto.endDate(), dto.startDate());
+        Duration duration = Duration.ofMinutes(dto.durationMinutes());
+        eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
         subjectService.findById(dto.subjectId());
         CommissionResponseDto commission = commissionService.findById(dto.commissionId());
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
                 .startTime(dto.startTime())
-                .duration(Duration.ofMinutes(dto.durationMinutes()))
+                .duration(duration)
                 .dayOfWeek(dto.dayOfWeek())
                 .startDate(dto.startDate())
                 .endDate(dto.endDate())
@@ -281,7 +293,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         }
         eventRepository.saveAll(created);
         occurrenceRepository.saveAll(created.stream()
-                .filter(event -> event.getSysacadHash() == null || Boolean.TRUE.equals(event.getSysacadEnabled()))
+                .filter(event -> Boolean.TRUE.equals(event.getSigaEnabled()))
                 .flatMap(event -> event.toOccurrences(windowByCommission.getOrDefault(
                         event.getCommissionId(), windowFor(null))).stream())
                 .toList());
@@ -302,13 +314,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                     boolean noEnrolled = cmd.enrolled() == 0;
                     boolean enrolledChanged = !Objects.equals(existing.getEnrolled(), cmd.enrolled());
                     boolean durationChanged = reconcileDuration(existing, cmd.durationMinutes());
-                    boolean stateChanged = Boolean.TRUE.equals(existing.getSysacadEnabled()) == noEnrolled;
+                    boolean stateChanged = Boolean.TRUE.equals(existing.getSigaEnabled()) == noEnrolled;
                     if (!enrolledChanged && !durationChanged && !stateChanged) {
                         return;
                     }
                     existing.setEnrolled(cmd.enrolled());
                     existing.setSyncedAt(now);
-                    existing.setSysacadEnabled(!noEnrolled);
+                    existing.setSigaEnabled(!noEnrolled);
                     if (existing.getId() != null) {
                         updated.add(existing);
                         if (stateChanged) {
@@ -350,7 +362,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .commissionId(cmd.commissionId())
                 .syncedAt(now)
                 .sysacadHash(Hashes.sha256Hex(cmd.durationMinutes()))
-                .sysacadEnabled(cmd.enrolled() > 0)
+                .sigaEnabled(cmd.enrolled() > 0)
                 .build();
     }
 
@@ -474,18 +486,19 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         // Events of unresolvedCommissionIds still count in currentRows. What syncRecurringEvents already wrote
         // before an abort here stays written (the guard only prevents deactivations).
         long currentRows = syncOwned.stream()
-                .filter(event -> !Boolean.FALSE.equals(event.getSysacadEnabled())).count();
+                .filter(event -> Boolean.TRUE.equals(event.getSigaEnabled())).count();
         SyncGuard.requireEnoughValidRows("eventos", presentEventIds.size(), currentRows, minValidPercent);
         for (RecurringEvent event : syncOwned) {
-            if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())
+            if (presentEventIds.contains(event.getId()) || !Boolean.TRUE.equals(event.getSigaEnabled())
                     || unresolvedCommissionIds.contains(event.getCommissionId())) {
                 continue;
             }
-            event.setSysacadEnabled(false);
+            event.setSigaEnabled(false);
             event.setSyncedAt(now);
             recurringEventRepository.save(event);
+            recurringEventReconciler.retireFuture(event);
             affected++;
-            log.info("Evento recurrente marcado como no vigente en SysAcad: id={}", event.getId());
+            log.info("Evento recurrente dado de baja por ausencia en SysAcad: id={}", event.getId());
         }
         return affected;
     }
@@ -506,7 +519,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return recurringEventRepository.findBySysacadHashIsNotNull().stream()
                 .map(r -> new SysacadRecurringEventRefDto(r.getId(), r.getSubjectId(), r.getCommissionId(),
                         r.getDayOfWeek(), r.getStartTime(), r.getStartDate(), r.getEndDate(),
-                        !Boolean.FALSE.equals(r.getSysacadEnabled())))
+                        Boolean.TRUE.equals(r.getSysacadEnabled()), Boolean.TRUE.equals(r.getSigaEnabled())))
                 .toList();
     }
 
@@ -573,6 +586,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Occurrence", id));
 
         eventScheduleValidator.validateNotPast(principal);
+        eventScheduleValidator.validateNotPast(dto.date(), dto.startTime());
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
@@ -589,6 +603,10 @@ public class AcademicEventServiceImpl implements AcademicEventService {
             }
             eventScheduleValidator.validateCommissionBelongsToSubject(dto.subjectId(), dto.commissionId());
         }
+
+        boolean rescheduled = !event.getDate().equals(dto.date())
+                || !event.getStartTime().equals(dto.startTime())
+                || !event.getDuration().equals(duration);
 
         event.setEnrolled(dto.enrolled());
         event.setStartTime(dto.startTime());
@@ -611,9 +629,32 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         event.setSubjectId(dto.subjectId());
         event.setCommissionId(dto.commissionId());
         occurrences.forEach(o -> o.setDate(dto.date()));
+        if (rescheduled) {
+            // Sincrónico y en esta transacción: si allocation rechaza el solape, la edición hace rollback.
+            eventPublisher.publishEvent(new UniqueEventRescheduled(id,
+                    occurrences.stream().map(Occurrence::getId).toList(), dto.date(), dto.observation()));
+        }
 
         log.info("Evento único actualizado: id={}", id);
         return composer.compose(event);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Baja de evento único", subject = "AcademicEvent")
+    public void deleteUniqueEvent(Long eventId) {
+        UniqueEvent event = Finder.orThrow(uniqueEventRepository::findById, eventId, "UniqueEvent");
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
+        List<Long> occurrenceIds = occurrences.stream().map(Occurrence::getId).toList();
+        if (!occurrenceAllocationQuery.allocatedAmong(occurrenceIds).isEmpty()
+                || !occurrenceRequestReferenceQuery.referencedAmong(occurrenceIds).isEmpty()) {
+            throw new UniqueEventInUseException(eventId);
+        }
+
+        occurrenceRepository.deleteAll(occurrences);
+        uniqueEventRepository.delete(event);
+
+        log.info("Evento único borrado: id={}, ocurrencias={}", eventId, occurrences.size());
     }
 
 }

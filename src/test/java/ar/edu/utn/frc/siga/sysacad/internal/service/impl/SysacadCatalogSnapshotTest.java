@@ -246,7 +246,7 @@ class SysacadCatalogSnapshotTest {
                 List.of(scheduleWithCourse("..."), scheduleWithCourse(null), scheduleWithCourse("5D1."))
         ).findSubjectCommissions();
 
-        assertThat(result).containsExactly(new SysacadSubjectCommissionDto("5D1", 519, 30));
+        assertThat(result).containsExactly(new SysacadSubjectCommissionDto("5D1", 17, 94, 519, 30));
     }
 
     @Test

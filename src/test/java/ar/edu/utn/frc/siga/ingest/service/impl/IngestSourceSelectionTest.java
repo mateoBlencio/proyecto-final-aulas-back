@@ -13,6 +13,8 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.util.List;
 
@@ -44,6 +46,8 @@ class IngestSourceSelectionTest {
 
     @Mock
     private OccurrenceBoardService occurrenceBoardService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private IngestServiceImpl service;
 
@@ -51,7 +55,9 @@ class IngestSourceSelectionTest {
     void setUp() {
         lenient().when(excelSource.supports(any())).thenReturn(false);
         lenient().when(csvSource.supports(any())).thenReturn(false);
-        service = new IngestServiceImpl(List.of(excelSource, csvSource), batchProcessor, allocationService, occurrenceBoardService);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        service = new IngestServiceImpl(List.of(excelSource, csvSource), batchProcessor, allocationService,
+                occurrenceBoardService, transactionManager);
     }
 
     @Test
@@ -60,8 +66,7 @@ class IngestSourceSelectionTest {
         MockMultipartFile file = new MockMultipartFile("file", "planilla.csv", "text/csv", new byte[0]);
         when(csvSource.supports("planilla.csv")).thenReturn(true);
         when(csvSource.parse(file)).thenReturn(new IngestSource.ParsedContent(List.of(), 2026));
-        when(batchProcessor.process(any(), eq(2026))).thenReturn(
-                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
+        stubBatch();
 
         IngestResultDto result = service.ingestFile(file);
 
@@ -84,8 +89,7 @@ class IngestSourceSelectionTest {
         MockMultipartFile file = new MockMultipartFile("file", "vacia.xlsx", "application/vnd.ms-excel", new byte[0]);
         when(excelSource.supports("vacia.xlsx")).thenReturn(true);
         when(excelSource.parse(file)).thenReturn(new IngestSource.ParsedContent(List.of(), 2026));
-        when(batchProcessor.process(any(), eq(2026))).thenReturn(
-                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
+        stubBatch();
 
         service.ingestFile(file);
 
@@ -98,13 +102,20 @@ class IngestSourceSelectionTest {
         MockMultipartFile file = new MockMultipartFile("file", "planilla.xlsx", "application/vnd.ms-excel", new byte[0]);
         when(excelSource.supports("planilla.xlsx")).thenReturn(true);
         when(excelSource.parse(file)).thenReturn(new IngestSource.ParsedContent(List.of(), 2026));
-        when(batchProcessor.process(any(), eq(2026))).thenReturn(
-                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
+        stubBatch();
 
         service.ingestFile(file);
 
         InOrder inOrder = inOrder(batchProcessor, occurrenceBoardService);
-        inOrder.verify(batchProcessor).process(any(), eq(2026));
+        inOrder.verify(batchProcessor).resolve(any(), eq(2026));
+        inOrder.verify(batchProcessor).write(any());
         inOrder.verify(occurrenceBoardService).invalidateCache();
+    }
+
+    private void stubBatch() {
+        IngestRowBatchProcessor.ResolvedBatch resolved = new IngestRowBatchProcessor.ResolvedBatch(List.of(), 0, List.of());
+        when(batchProcessor.resolve(any(), eq(2026))).thenReturn(resolved);
+        when(batchProcessor.write(resolved)).thenReturn(
+                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
     }
 }

@@ -163,6 +163,7 @@ class AuditLateDescriptionIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("las revisiones de otras operaciones conservan su descripción")
     void otherOperationsKeepTheirDescription() throws Exception {
         rememberOriginals();
+        originals.put(SettingKey.EVENTS_HOURS_END, settingsStore.getRaw(SettingKey.EVENTS_HOURS_END));
         mockMvc.perform(put("/v1/settings/{key}", "events.hours.end")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"22:11\"}"))

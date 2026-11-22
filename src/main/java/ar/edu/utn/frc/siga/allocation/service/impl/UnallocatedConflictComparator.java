@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
 import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
+import ar.edu.utn.frc.siga.common.util.Paging;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
@@ -21,11 +22,7 @@ final class UnallocatedConflictComparator {
     }
 
     static void validate(Sort sort) {
-        for (Sort.Order order : sort) {
-            if (!SORTABLE.contains(order.getProperty())) {
-                throw new InvalidSortPropertyException(order.getProperty(), SORTABLE);
-            }
-        }
+        Paging.requireSortable(sort, SORTABLE);
     }
 
     static Comparator<UnallocatedConflictDto> of(Sort sort) {

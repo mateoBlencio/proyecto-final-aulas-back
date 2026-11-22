@@ -34,6 +34,8 @@ class NotificationSenderImpl implements NotificationSender {
     private static final Map<NotificationChannel, SettingKey> CHANNEL_TOGGLES =
             Map.of(NotificationChannel.EMAIL, SettingKey.NOTIFICATIONS_CHANNEL_EMAIL_ENABLED);
 
+    private static final int MAX_SUBJECT_LENGTH = 255;
+
     private final SettingsReader settingsReader;
     private final ChannelRegistry channelRegistry;
     private final NotificationRenderer renderer;
@@ -89,18 +91,44 @@ class NotificationSenderImpl implements NotificationSender {
      *  siempre recibe la respuesta, también cuando el llamador manda las suyas (auxiliares de un edificio). */
     private String resolveReplyTo(NotificationRequest request) {
         Map<String, String> addresses = new LinkedHashMap<>();
-        List<String> requested = request.replyTo() == null ? List.of() : request.replyTo();
-        for (String address : requested) {
-            addAddress(addresses, address);
-        }
+        addAll(addresses, request.replyTo());
         addAddress(addresses, properties.getEmail().getReplyTo());
         return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    private static String resolveCc(NotificationRequest request) {
+        Map<String, String> addresses = new LinkedHashMap<>();
+        addAll(addresses, request.cc());
+        return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    /** La copia oculta sin las direcciones que ya van en copia: nadie recibe el mail dos veces. */
+    private static String resolveBcc(NotificationRequest request) {
+        Map<String, String> addresses = new LinkedHashMap<>();
+        addAll(addresses, request.bcc());
+        Map<String, String> cc = new LinkedHashMap<>();
+        addAll(cc, request.cc());
+        addresses.keySet().removeAll(cc.keySet());
+        return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    private static void addAll(Map<String, String> addresses, List<String> requested) {
+        if (requested != null) {
+            requested.forEach(address -> addAddress(addresses, address));
+        }
     }
 
     private static void addAddress(Map<String, String> addresses, String address) {
         if (address != null && !address.isBlank()) {
             addresses.putIfAbsent(address.strip().toLowerCase(Locale.ROOT), address.strip());
         }
+    }
+
+    /** La columna {@code asunto} es varchar(255): un asunto más largo haría fallar el insert y tiraría todo el envío. */
+    private static String truncateSubject(String subject) {
+        return subject != null && subject.length() > MAX_SUBJECT_LENGTH
+                ? subject.substring(0, MAX_SUBJECT_LENGTH)
+                : subject;
     }
 
     private static Notification newNotification(
@@ -114,9 +142,11 @@ class NotificationSenderImpl implements NotificationSender {
                 .channel(channel)
                 .recipient(recipient.email())
                 .recipientName(recipient.displayName())
-                .subject(rendered.subject())
+                .subject(truncateSubject(rendered.subject()))
                 .body(rendered.body())
                 .replyTo(replyTo)
+                .cc(resolveCc(request))
+                .bcc(resolveBcc(request))
                 .idempotencyKey(request.idempotencyKey())
                 .nextAttemptAt(Instant.now())
                 .build();

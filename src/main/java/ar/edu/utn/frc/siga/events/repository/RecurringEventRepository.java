@@ -32,15 +32,15 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
     List<RecurringEvent> findBySubjectIdAndCommissionId(Long subjectId, Long commissionId);
 
     /**
-     * Cursado vigente de una comisión en una materia: eventos que SysAcad tiene activos
-     * ({@code sysacadEnabled}) o que se cargaron a mano ({@code sysacadHash} nulo, nunca los toca el sync),
-     * cuyo período de dictado no terminó todavía. Es la fuente de "días y horarios de cursado" para las
-     * solicitudes de aula (cambio de aula y parcial en horario de clases).
+     * Cursado vigente de una comisión en una materia: eventos no dados de baja por SIGA
+     * ({@code sigaEnabled}; los cargados a mano o por Excel nacen habilitados), cuyo período de dictado
+     * no terminó todavía. Es la fuente de "días y horarios de cursado" para las solicitudes de aula
+     * (cambio de aula y parcial en horario de clases).
      */
     @Query("""
             select r from RecurringEvent r
             where r.subjectId = :subjectId and r.commissionId = :commissionId
-              and (r.sysacadEnabled = true or r.sysacadHash is null)
+              and r.sigaEnabled = true
               and (r.endDate is null or r.endDate >= :onOrAfter)
             order by r.dayOfWeek, r.startTime
             """)
@@ -51,12 +51,15 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
     @Query("""
             select r from RecurringEvent r
             where r.subjectId = :subjectId
-              and (r.sysacadEnabled = true or r.sysacadHash is null)
+              and r.sigaEnabled = true
               and (r.endDate is null or r.endDate >= :onDate)
             order by r.commissionId, r.dayOfWeek, r.startTime
             """)
     List<RecurringEvent> findActiveBySubject(@Param("subjectId") Long subjectId,
                                              @Param("onDate") LocalDate onDate);
+
+    /** Eventos recurrentes no dados de baja por SIGA. */
+    List<RecurringEvent> findBySigaEnabledTrue();
 
     /**
      * "Sync-owned": sólo {@link ar.edu.utn.frc.siga.events.service.AcademicEventService#syncRecurringEvent}

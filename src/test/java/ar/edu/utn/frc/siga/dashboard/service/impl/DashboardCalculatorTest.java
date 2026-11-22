@@ -183,6 +183,21 @@ class DashboardCalculatorTest {
     }
 
     @Test
+    void bandUpToMidnightCountsLateClassInItsSlotAndHasPositiveBand() {
+        var params = new DashboardParameters(50, 40, LocalTime.of(8, 0), LocalTime.MIDNIGHT, 1);
+        var late = unit(1, 10, 1, MONDAY, 1, 22, 0, 60, 20, 30); // 22:00-23:00
+
+        ScopeMetrics metrics = DashboardCalculator
+                .calculate(new CalculationInput(Set.of(MONDAY), ONE_BUILDING, List.of(late), params)).get(1L);
+
+        assertThat(metrics.occupiedBySlot()).hasSize(16);
+        assertThat(metrics.occupiedBySlot()[22 - 8]).isEqualTo(60);
+        assertThat(metrics.occupiedRoomMinutes()).isEqualTo(60);
+        assertThat(metrics.availableRoomMinutes()).isEqualTo(3L * 960);
+        assertThat(metrics.availableBySlot()[23 - 8]).isEqualTo(3L * 60);
+    }
+
+    @Test
     void allocationOnUnavailableDateIsIgnored() {
         var u = unit(1, 10, 1, TUESDAY, 1, 10, 0, 60, 99, 30);
 

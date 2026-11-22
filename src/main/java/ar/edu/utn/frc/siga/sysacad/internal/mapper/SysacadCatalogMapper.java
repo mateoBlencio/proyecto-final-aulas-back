@@ -121,6 +121,8 @@ public class SysacadCatalogMapper {
         }
         return new SysacadSubjectCommissionDto(
                 curso,
+                raw.especialidad(),
+                raw.plan(),
                 raw.materia(),
                 raw.inscriptos());
     }

@@ -326,6 +326,29 @@ class AcademicEventSyncServiceTest {
     }
 
     @Test
+    @DisplayName("sync: dos filas no resueltas del mismo curso consultan una sola vez las comisiones vigentes y las protegen igual")
+    void syncQueriesActiveIdsOnceForRepeatedUnresolvedCourse() {
+        SysacadAcademicEventDto monday = new SysacadAcademicEventDto(
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        SysacadAcademicEventDto thursday = new SysacadAcademicEventDto(
+                "101", 55, 1, 2024, DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90, 1);
+        SysacadAcademicEventDto healthy = new SysacadAcademicEventDto(
+                "202", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(10, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(monday, thursday, healthy));
+        when(commissionService.findActiveByCourseCode("101"))
+                .thenThrow(ResourceNotFoundException.of("Commission", "101"));
+        when(commissionService.findActiveIdsByCourseCode("101")).thenReturn(List.of(7L, 8L));
+        when(commissionService.findActiveByCourseCode("202")).thenReturn(commission(2L, "202", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 55, 1, 2024)).thenReturn(link(9L, 2L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
+
+        service.sync(catalogReader);
+
+        verify(commissionService, times(1)).findActiveIdsByCourseCode("101");
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L), Set.of(7L, 8L), 50);
+    }
+
+    @Test
     @DisplayName("sync: DURACION nula o cuatrimestre inválido también protegen la comisión; una resuelta sana no")
     void syncProtectsCommissionOfRowsWithoutDurationOrTerm() {
         SysacadAcademicEventDto noDuration = new SysacadAcademicEventDto(

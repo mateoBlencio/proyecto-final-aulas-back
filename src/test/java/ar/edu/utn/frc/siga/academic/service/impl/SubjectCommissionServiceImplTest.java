@@ -13,12 +13,17 @@ import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -143,6 +148,50 @@ class SubjectCommissionServiceImplTest {
         when(subjectCommissionMapper.toDto(only)).thenReturn(dto);
 
         assertThat(service.findByCommissionAndSubjectCode(2L, 101, 9, 1999)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: una sola candidata sin coincidencia exacta loguea WARN con materia, comisión, especialidad y plan")
+    void findByCommissionAndSubjectCodeWarnsWhenFallingBackToSingleCandidate() {
+        SubjectCommission only = linkOf(1L, 5, 2008);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(only));
+        when(subjectCommissionMapper.toDto(only))
+                .thenReturn(new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true));
+
+        List<ILoggingEvent> events = capturingLogs(() -> service.findByCommissionAndSubjectCode(2L, 101, 9, 1999));
+
+        assertThat(events).filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("materia 101 de la comisión 2", "especialidad=9", "plan=1999", "único candidato"));
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: con coincidencia exacta no loguea el WARN del candidato único")
+    void findByCommissionAndSubjectCodeDoesNotWarnOnExactMatch() {
+        SubjectCommission only = linkOf(1L, 5, 2008);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(only));
+        when(subjectCommissionMapper.toDto(only))
+                .thenReturn(new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true));
+
+        List<ILoggingEvent> events = capturingLogs(() -> service.findByCommissionAndSubjectCode(2L, 101, 5, 2008));
+
+        assertThat(events).filteredOn(event -> event.getLevel() == Level.WARN).isEmpty();
+    }
+
+    private static List<ILoggingEvent> capturingLogs(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(SubjectCommissionServiceImpl.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return appender.list;
     }
 
     @Test

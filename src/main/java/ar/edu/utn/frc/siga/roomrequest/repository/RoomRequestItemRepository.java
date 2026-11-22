@@ -58,6 +58,9 @@ public interface RoomRequestItemRepository
             + "and i.acceptanceDeadline <= :now")
     List<RoomRequestItem> findNotifiedWithDeadlineUntil(@Param("now") Instant now);
 
+    @Query("select distinct i from RoomRequestItem i join i.allocations a where a.occurrenceId in :ids")
+    List<RoomRequestItem> findByAllocationOccurrenceIdIn(@Param("ids") Collection<Long> ids);
+
     @Query("""
             select distinct i from RoomRequestItem i join fetch i.request
             left join i.preferences p left join i.allocations a

@@ -24,7 +24,8 @@ public record UpdateUniqueEventRequestDto(
         Boolean requiresComputers,
         @Min(1) Integer computerCount,
         @Size(max = 255) String requiredSoftware,
-        Boolean requiresExamUsers
+        Boolean requiresExamUsers,
+        @Size(max = 255) String observation
 ) {
 
     @AssertTrue(message = "Debe indicar la cantidad de computadoras si requiere computadoras, y omitirla si no")

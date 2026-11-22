@@ -129,9 +129,9 @@ class PriorRoomPreviewIntegrationTest extends AbstractIntegrationTest {
         Long ownerWednesday = createEvent(wednesday, LocalTime.of(19, 55), 145);
         allocateDirect(ownerThursday, roomX.getId());
         allocateDirect(ownerWednesday, roomX.getId());
-        Long competitorWednesday = createEvent(wednesday, LocalTime.of(19, 55), 190);
+        Long competitorWednesday = createEvent(wednesday, LocalTime.of(19, 55), 185);
         Long competitorThursdayEarly = createEvent(thursday, LocalTime.of(17, 20), 145);
-        Long competitorThursdayLate = createEvent(thursday, LocalTime.of(19, 55), 190);
+        Long competitorThursdayLate = createEvent(thursday, LocalTime.of(19, 55), 185);
 
         MvcResult previewResult = mockMvc.perform(post("/v1/previews")
                         .contentType(MediaType.APPLICATION_JSON)

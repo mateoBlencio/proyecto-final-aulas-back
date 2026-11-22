@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface HolidayRepository extends JpaRepository<Holiday, LocalDate> {
 
-    List<Holiday> findByDateBetweenOrderByDateAsc(LocalDate from, LocalDate to);
+    List<Holiday> findByDateBetweenAndDeletedAtIsNullOrderByDateAsc(LocalDate from, LocalDate to);
 }

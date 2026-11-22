@@ -60,7 +60,7 @@ class CommissionSyncServiceTest {
         SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
         when(catalogReader.findCommissions()).thenReturn(List.of(row));
         when(catalogReader.findSubjectCommissions())
-                .thenReturn(List.of(new SysacadSubjectCommissionDto("101", 55, 30)));
+                .thenReturn(List.of(new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30)));
         when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(2);
 
         service.sync(catalogReader);
@@ -79,9 +79,9 @@ class CommissionSyncServiceTest {
         SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
         when(catalogReader.findCommissions()).thenReturn(List.of(row));
         when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
-                new SysacadSubjectCommissionDto("101", 55, 12),
-                new SysacadSubjectCommissionDto("101", 55, 30),
-                new SysacadSubjectCommissionDto("101", 55, 7)));
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 12),
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30),
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 7)));
         when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
@@ -91,6 +91,49 @@ class CommissionSyncServiceTest {
         verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
                 new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30));
+    }
+
+    @Test
+    @DisplayName("sync: mismo curso y materia con distinto plan o especialidad toman cada uno su propio conteo, sin fusionar con el máximo")
+    void syncKeepsSeparateEnrollmentPerSpecialtyAndStudyPlan() {
+        when(catalogReader.findCommissions()).thenReturn(List.of(
+                new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1),
+                new SysacadCommissionDto("101", 1, 2008, 55, 2026, 1),
+                new SysacadCommissionDto("101", 2, 2024, 55, 2026, 1)));
+        when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 12),
+                new SysacadSubjectCommissionDto("101", 1, 2008, 55, 30),
+                new SysacadSubjectCommissionDto("101", 2, 2024, 55, 7)));
+        when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(3);
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
+        verify(commissionService).syncCommissions(captor.capture(), eq(50));
+        assertThat(captor.getValue()).containsExactly(
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 12),
+                new CommissionSyncCommand("101", 1, 2008, 55, 2026, 30),
+                new CommissionSyncCommand("101", 2, 2024, 55, 2026, 7));
+    }
+
+    @Test
+    @DisplayName("sync: el conteo de otro plan o especialidad no se aplica a una comisión sin inscriptos propios")
+    void syncDoesNotBorrowEnrollmentFromOtherStudyPlan() {
+        when(catalogReader.findCommissions()).thenReturn(List.of(
+                new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1)));
+        when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
+                new SysacadSubjectCommissionDto("101", 1, 2008, 55, 30),
+                new SysacadSubjectCommissionDto("101", 2, 2024, 55, 7)));
+        when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
+        verify(commissionService).syncCommissions(captor.capture(), eq(50));
+        assertThat(captor.getValue()).containsExactly(
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null));
     }
 
     @Test

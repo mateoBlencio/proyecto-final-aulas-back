@@ -26,7 +26,6 @@ import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -52,7 +51,6 @@ class IngestRowResolver {
     private record SpaceRefs(BuildingResponseDto building, ClassroomResponseDto classroom) {
     }
 
-    @Transactional
     ResolvedRefs resolveRefs(RowDto dto, TermType termType, int year, LocalDate startDate, LocalDate endDate,
             IngestCache cache, AtomicInteger periodsCreated) {
         AcademicRefs academic = resolveAcademicRefs(dto, termType, year, cache, periodsCreated);

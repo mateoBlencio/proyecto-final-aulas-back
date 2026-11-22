@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.ObjectMapper;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +35,9 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ClassroomRepository classroomRepository;
+
+    @Autowired
+    private ClassroomTypeRepository classroomTypeRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -140,6 +145,59 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(classroomRepository.findActiveById(id)).isEmpty();
         assertThat(classroomRepository.findById(id)).get()
                 .satisfies(classroom -> assertThat(classroom.isDeleted()).isTrue());
+    }
+
+    @Test
+    @DisplayName("PUT /v1/classrooms/{id} de aula sincronizada con otra capacidad responde 409 y no toca la base")
+    void update_sysacadClassroomWithDifferentCapacity_returns409AndKeepsRow() throws Exception {
+        Classroom classroom = sysacadClassroom(testData.edificio(), testData.tipoAulaPorDefecto(), 40);
+        ClassroomRequestDto dto = new ClassroomRequestDto(classroom.getRoomNumber(), 55,
+                classroom.getClassroomType().getId(), classroom.getBuilding().getId());
+
+        mockMvc.perform(put("/v1/classrooms/" + classroom.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Aula sincronizada con SysAcad"))
+                .andExpect(jsonPath("$.detail").value("El aula " + classroom.getId()
+                        + " viene de SysAcad: no se puede modificar la capacidad."));
+
+        Classroom reloaded = classroomRepository.findById(classroom.getId()).orElseThrow();
+        assertThat(reloaded.getCapacity()).isEqualTo(40);
+        assertThat(reloaded.getRoomNumber()).isEqualTo(classroom.getRoomNumber());
+    }
+
+    @Test
+    @DisplayName("PUT /v1/classrooms/{id} de aula sincronizada con los mismos valores y otro tipo responde 200 y guarda el tipo")
+    void update_sysacadClassroomWithSameFieldsAndOtherType_returns200() throws Exception {
+        Classroom classroom = sysacadClassroom(testData.edificio(), testData.tipoAulaPorDefecto(), 40);
+        ClassroomType laboratory = classroomTypeRepository.save(ClassroomType.builder()
+                .description("Laboratorio-" + IntegrationTestData.nextSeq()).build());
+        ClassroomRequestDto dto = new ClassroomRequestDto(classroom.getRoomNumber(), 40,
+                laboratory.getId(), classroom.getBuilding().getId());
+
+        mockMvc.perform(put("/v1/classrooms/" + classroom.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.classroomTypeId").value(laboratory.getId()))
+                .andExpect(jsonPath("$.capacity").value(40));
+
+        Classroom reloaded = classroomRepository.findById(classroom.getId()).orElseThrow();
+        assertThat(reloaded.getClassroomType().getId()).isEqualTo(laboratory.getId());
+        assertThat(reloaded.getCapacity()).isEqualTo(40);
+    }
+
+    private Classroom sysacadClassroom(Building building, ClassroomType tipo, int capacity) {
+        return classroomRepository.save(Classroom.builder()
+                .roomNumber((int) IntegrationTestData.nextSeq())
+                .capacity(capacity)
+                .building(building)
+                .classroomType(tipo)
+                .sysacadEnabled(true)
+                .sysacadHash("hash-" + IntegrationTestData.nextSeq())
+                .build());
     }
 
     @Test

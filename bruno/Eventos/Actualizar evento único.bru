@@ -23,7 +23,8 @@ body:json {
     "startTime": "20:00",
     "durationMinutes": 120,
     "enrolled": 50,
-    "description": "Mesa de examen final, turno julio (reprogramada)"
+    "description": "Mesa de examen final, turno julio (reprogramada)",
+    "observation": "Solape tolerado con el examen del aula 5"
   }
 }
 
@@ -41,6 +42,12 @@ docs {
   404 si el id no corresponde a un evento único (inexistente o recurrente), o
   si subjectId/commissionId no existen. 409 si ya ocurrió. 400 si falta
   subjectId con eventType distinto de OTRO, o si viene commissionId sin
-  subjectId. La disponibilidad de aula y el solapamiento ya no se validan
-  acá (no hay aula involucrada en este call).
+  subjectId. La nueva fecha y hora tampoco pueden ser pasadas.
+
+  Si cambian fecha, hora o duración y el evento tiene aula asignada, se
+  revalida el solape con el mismo criterio que la asignación manual:
+  solape mayor a allocation.max-overlap-minutes responde 409; solape dentro
+  del margen sin "observation" responde el error de observación requerida
+  (el front reintenta con "observation", opcional, máx. 255). Los pedidos de
+  aula atados al evento actualizan su fecha.
 }

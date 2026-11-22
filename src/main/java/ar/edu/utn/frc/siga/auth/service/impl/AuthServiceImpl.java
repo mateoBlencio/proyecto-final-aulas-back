@@ -40,8 +40,8 @@ public class AuthServiceImpl implements AuthService {
     private final LoginRateLimiter loginRateLimiter;
     private final AuthDomainProperties authDomainProperties;
 
+    // Sin @Transactional: el hash BCrypt no debe retener una conexión; issue() abre su propia transacción
     @Override
-    @Transactional
     public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = AuthDomainProperties.normalizeEmail(request.email());
         String ip = httpRequest.getRemoteAddr();

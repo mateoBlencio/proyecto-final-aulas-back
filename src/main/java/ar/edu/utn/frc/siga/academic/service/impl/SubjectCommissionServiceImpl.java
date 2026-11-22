@@ -93,6 +93,10 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
                 .filter(link -> isOfStudyPlan(link.getSubject().getStudyPlan(), specialtyCode, studyPlanCode))
                 .toList();
         List<SubjectCommission> chosen = exact.isEmpty() ? candidates : exact;
+        if (exact.isEmpty() && candidates.size() == 1) {
+            log.warn("La materia {} de la comisión {} no coincide con especialidad={}, plan={}: se usa el único "
+                    + "candidato", subjectCode, commissionId, specialtyCode, studyPlanCode);
+        }
         if (chosen.size() == 1) {
             return subjectCommissionMapper.toDto(chosen.getFirst());
         }

@@ -10,11 +10,12 @@ import ar.edu.utn.frc.siga.buildingactivity.model.RoomRequestItemRef;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivitySeenRepository;
 import ar.edu.utn.frc.siga.buildingactivity.service.BuildingActivityService;
-import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.search.LikePatterns;
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.util.Paging;
+import ar.edu.utn.frc.siga.common.util.Zones;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
@@ -31,7 +32,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -65,11 +65,11 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("buildingId"), buildingId));
         }
         if (from != null) {
-            Instant start = from.atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant start = from.atStartOfDay(Zones.LOCAL).toInstant();
             spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.<Instant>get("occurredAt"), start));
         }
         if (to != null) {
-            Instant end = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant end = to.plusDays(1).atStartOfDay(Zones.LOCAL).toInstant();
             spec = spec.and((root, query, cb) -> cb.lessThan(root.<Instant>get("occurredAt"), end));
         }
         long watermark = watermark(user);
@@ -107,16 +107,14 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
     @Override
     @Transactional
     public void markSeen(String user, Long lastSeenId) {
-        seenRepository.advance(user, lastSeenId);
+        // Sin tope, un id enorme dejaría la marca por encima de toda actividad futura y la ocultaría.
+        repository.findBy(inScope(), query -> query.sortBy(Sort.by(Sort.Direction.DESC, "id")).first())
+                .ifPresent(latest -> seenRepository.advance(user, Math.min(lastSeenId, latest.getId())));
     }
 
     private static Specification<BuildingActivity> orderedBy(Sort sort) {
         List<Sort.Order> requested = sort.isSorted() ? sort.toList() : List.of(Sort.Order.desc("occurredAt"));
-        requested.forEach(order -> {
-            if (!SORTABLE.contains(order.getProperty())) {
-                throw new InvalidSortPropertyException(order.getProperty(), SORTABLE);
-            }
-        });
+        Paging.requireSortable(Sort.by(requested), SORTABLE);
         return (root, query, cb) -> {
             if (!Long.class.equals(query.getResultType())) {
                 List<Order> orders = new ArrayList<>();

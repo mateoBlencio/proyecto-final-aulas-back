@@ -6,6 +6,8 @@ import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -143,6 +145,49 @@ class SettingValueValidatorTest {
         assertThatThrownBy(() -> validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "yes"))
                 .isInstanceOf(InvalidSettingValueException.class);
         assertThatThrownBy(() -> validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "1"))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("validateEventHours: fin 00:00 es fin de día y pasa con cualquier inicio")
+    void eventHoursMidnightEndIsAccepted() {
+        assertThatCode(() -> validator.validateEventHours(LocalTime.of(8, 0), LocalTime.MIDNIGHT))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio 00:00 con fin 00:00 pasa")
+    void eventHoursMidnightStartAndEndIsAccepted() {
+        assertThatCode(() -> validator.validateEventHours(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio igual al fin (08:00/08:00) lanza 400")
+    void eventHoursStartEqualToEndIsRejected() {
+        assertThatThrownBy(() -> validator.validateEventHours(LocalTime.of(8, 0), LocalTime.of(8, 0)))
+                .isInstanceOf(InvalidSettingValueException.class)
+                .hasMessage("La hora de inicio de la ventana horaria (08:00) debe ser anterior a la hora de fin (08:00)");
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio un minuto antes del fin (08:00/08:01) pasa")
+    void eventHoursStartOneMinuteBeforeEndIsAccepted() {
+        assertThatCode(() -> validator.validateEventHours(LocalTime.of(8, 0), LocalTime.of(8, 1)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio posterior al fin (09:00/08:00) lanza 400")
+    void eventHoursStartAfterEndIsRejected() {
+        assertThatThrownBy(() -> validator.validateEventHours(LocalTime.of(9, 0), LocalTime.of(8, 0)))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio un minuto después del fin (08:01/08:00) lanza 400")
+    void eventHoursStartOneMinuteAfterEndIsRejected() {
+        assertThatThrownBy(() -> validator.validateEventHours(LocalTime.of(8, 1), LocalTime.of(8, 0)))
                 .isInstanceOf(InvalidSettingValueException.class);
     }
 }

@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -19,6 +20,7 @@ final class SysacadCommissionResolver {
     private final SubjectCommissionService subjectCommissionService;
     private final Map<String, Optional<CommissionResponseDto>> commissionCache = new HashMap<>();
     private final Map<LinkKey, Optional<SubjectCommissionResponseDto>> linkCache = new HashMap<>();
+    private final Map<String, Set<Long>> activeIdsCache = new HashMap<>();
 
     SysacadCommissionResolver(CommissionService commissionService,
             SubjectCommissionService subjectCommissionService) {
@@ -35,6 +37,11 @@ final class SysacadCommissionResolver {
         Optional<SubjectCommissionResponseDto> link = resolveLink(
                 new LinkKey(commission.get().id(), subjectCode, specialtyCode, studyPlanCode));
         return link.map(l -> new ResolvedLink(commission.get(), l));
+    }
+
+    Set<Long> activeIdsByCourseCode(String courseCode) {
+        return activeIdsCache.computeIfAbsent(courseCode,
+                code -> Set.copyOf(commissionService.findActiveIdsByCourseCode(code)));
     }
 
     private Optional<CommissionResponseDto> resolveCommission(String courseCode) {

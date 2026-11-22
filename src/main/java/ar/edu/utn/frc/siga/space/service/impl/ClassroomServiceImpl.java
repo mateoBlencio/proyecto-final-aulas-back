@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
+import ar.edu.utn.frc.siga.space.exception.SysacadManagedClassroomException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.common.util.Hashes;
@@ -48,6 +49,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -201,6 +203,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.debug("Actualizando aula: id={}, roomNumber={}", id, dto.roomNumber());
 
         Classroom entity = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_UPDATE);
+        requireSysacadFieldsUnchanged(entity, dto);
         Building building = findActiveBuilding(dto.buildingId());
         if (!entity.getBuilding().getId().equals(dto.buildingId())) {
             buildingScopeResolver.requireAccess(Permission.CLASSROOM_UPDATE, dto.buildingId());
@@ -217,6 +220,27 @@ public class ClassroomServiceImpl implements ClassroomService {
         Classroom saved = classroomRepository.save(entity);
         log.info("Aula actualizada: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toDto(saved);
+    }
+
+    /** Un aula que trajo el sync de SysAcad conserva número, edificio y capacidad; el tipo sigue editable. */
+    private void requireSysacadFieldsUnchanged(Classroom entity, ClassroomRequestDto dto) {
+        if (entity.getSysacadHash() == null) {
+            return;
+        }
+        List<String> changed = new ArrayList<>();
+        if (!entity.getRoomNumber().equals(dto.roomNumber())) {
+            changed.add("el número");
+        }
+        if (!entity.getBuilding().getId().equals(dto.buildingId())) {
+            changed.add("el edificio");
+        }
+        if (!entity.getCapacity().equals(dto.capacity())) {
+            changed.add("la capacidad");
+        }
+        if (!changed.isEmpty()) {
+            log.warn("Modificación de aula sincronizada rechazada: id={}, campos={}", entity.getId(), changed);
+            throw new SysacadManagedClassroomException(entity.getId(), changed);
+        }
     }
 
     @Override

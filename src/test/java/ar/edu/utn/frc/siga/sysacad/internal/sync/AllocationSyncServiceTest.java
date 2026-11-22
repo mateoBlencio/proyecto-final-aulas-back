@@ -134,7 +134,7 @@ class AllocationSyncServiceTest {
     private SysacadRecurringEventRefDto eventRef(Long eventId, Long subjectId, Long commissionId,
             TermType termType, int year) {
         return new SysacadRecurringEventRefDto(eventId, subjectId, commissionId, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                termType.startDate(year), termType.endDate(year), true);
+                termType.startDate(year), termType.endDate(year), true, true);
     }
 
     @ParameterizedTest
@@ -295,7 +295,7 @@ class AllocationSyncServiceTest {
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
                 eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
                 new SysacadRecurringEventRefDto(101L, 9L, 1L, DayOfWeek.TUESDAY, LocalTime.of(8, 0),
-                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026), true)));
+                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026), true, true)));
 
         Logger logger = (Logger) LoggerFactory.getLogger(AllocationSyncService.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -409,7 +409,7 @@ class AllocationSyncServiceTest {
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
                 eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
                 new SysacadRecurringEventRefDto(200L, 10L, 2L, DayOfWeek.MONDAY, LocalTime.of(10, 0),
-                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026), true)));
+                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026), true, true)));
 
         Logger logger = (Logger) LoggerFactory.getLogger(AllocationSyncService.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();

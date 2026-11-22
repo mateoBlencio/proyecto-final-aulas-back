@@ -179,6 +179,10 @@ public class AllocationServiceImpl implements AllocationService {
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
         AllocationTargetResolver.ResolvedAssignments resolved = resolve(command, reassignsDeactivationReleases(command));
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        if (!command.currentScopeAuthorized()) {
+            Map<Long, Long> current = currentClassroomByOccurrence(List.copyOf(classroomByOccurrence.keySet()));
+            requireAccessToClassrooms(Set.copyOf(current.values()));
+        }
         lockAndValidate(command, classroomByOccurrence);
         describeAllocation(command.source(), true, resolved.skippedReleased().size());
         requestRoomForReactivated(resolved);
@@ -400,9 +404,33 @@ public class AllocationServiceImpl implements AllocationService {
         AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolve(command, false).classroomByOccurrence();
         lockAndValidate(command, classroomByOccurrence);
-        int affected = writer.syncFromSysacad(classroomByOccurrence, eventIdsToUpdate);
+        Map<OccurrenceSlotDto, Long> withoutConflicts = skipSysacadConflicts(classroomByOccurrence, eventIdsToUpdate);
+        int affected = writer.syncFromSysacad(withoutConflicts, eventIdsToUpdate);
         log.info("Sync de SysAcad: asignaciones afectadas={}", affected);
         return affected;
+    }
+
+    /** Saca del mapa las ocurrencias que el sync escribiría y que chocan con otra asignación o entre sí. */
+    private Map<OccurrenceSlotDto, Long> skipSysacadConflicts(Map<OccurrenceSlotDto, Long> classroomByOccurrence,
+            Set<Long> eventIdsToUpdate) {
+        Map<OccurrenceSlotDto, Long> writable = writer.writableFromSysacad(classroomByOccurrence, eventIdsToUpdate);
+        List<AllocationCandidate> candidates = writable.entrySet().stream()
+                .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
+                .toList();
+        List<OccurrenceConflictDto> conflicts = validator.strictConflicts(candidates);
+        if (conflicts.isEmpty()) {
+            return classroomByOccurrence;
+        }
+        Set<Long> conflictingIds = new HashSet<>();
+        for (OccurrenceConflictDto conflict : conflicts) {
+            if (conflictingIds.add(conflict.occurrenceId())) {
+                log.warn("Sync de SysAcad: la ocurrencia {} no se asigna al aula {}: choca con el evento {}",
+                        conflict.occurrenceId(), conflict.classroomId(), conflict.conflictingEventId());
+            }
+        }
+        Map<OccurrenceSlotDto, Long> remaining = new LinkedHashMap<>(classroomByOccurrence);
+        remaining.keySet().removeIf(o -> conflictingIds.contains(o.occurrenceId()));
+        return remaining;
     }
 
     @Override
@@ -449,6 +477,36 @@ public class AllocationServiceImpl implements AllocationService {
         AuditOperations.describe("Cambio directo en SysAcad" + reasonSuffix(command));
         log.info("Cambio directo de SysAcad aplicado: clases={}", changes.size());
         return new SysacadDirectChangeResult.Applied(changes);
+    }
+
+    @Override
+    @Transactional
+    public void revalidateRescheduled(Collection<Long> occurrenceIds, String observation) {
+        List<Allocation> allocations = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
+        if (allocations.isEmpty()) {
+            return;
+        }
+        // El auto-flush de JPA ya refleja la fecha y el horario nuevos en los slots.
+        Map<Long, Long> classroomByOccurrence = allocations.stream()
+                .collect(Collectors.toMap(Allocation::getOccurrenceId, Allocation::getClassroomId));
+        List<AllocationCandidate> candidates = occurrenceService.findSlots(classroomByOccurrence.keySet()).stream()
+                .map(slot -> new AllocationCandidate(slot, classroomByOccurrence.get(slot.occurrenceId())))
+                .toList();
+
+        classroomLock.lock(Set.copyOf(classroomByOccurrence.values()));
+        requireAccessToClassrooms(Set.copyOf(classroomByOccurrence.values()));
+        validator.validateNoSiblingRoomClash(candidates);
+        validator.validateManualOverlap(candidates, observation);
+
+        Set<Long> toleratedOccurrenceIds = validator.reviewManualOverlaps(candidates).tolerated().stream()
+                .map(OccurrenceConflictDto::occurrenceId)
+                .collect(Collectors.toSet());
+        allocations.stream()
+                .filter(a -> toleratedOccurrenceIds.contains(a.getOccurrenceId()))
+                .forEach(a -> a.setObservation(observation));
+        boardCache.invalidate();
+        log.info("Asignaciones revalidadas tras reprogramar: ocurrencias={}, toleradas={}",
+                classroomByOccurrence.size(), toleratedOccurrenceIds.size());
     }
 
     @Override
@@ -631,15 +689,15 @@ public class AllocationServiceImpl implements AllocationService {
         List<ClassroomResponseDto> classrooms = requireAccessToClassrooms(classroomIds);
         validator.validateClassroomsAvailable(classroomIds);
 
-        if (command.source() == AllocationSource.MANUAL || command.source() == AllocationSource.AUTOMATIC) {
-            List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
-                    .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
-                    .toList();
-            if (command.source() == AllocationSource.MANUAL) {
-                validator.validateManualOverlap(candidates, command.observation());
-            } else {
-                validator.validateStrictOverlap(candidates);
-            }
+        List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
+                .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
+                .toList();
+        validator.validateNoSiblingRoomClash(candidates);
+        // SYSACAD no lanza por solapes: syncFromSysacad saltea con WARN las ocurrencias que chocan.
+        switch (command.source()) {
+            case MANUAL -> validator.validateManualOverlap(candidates, command.observation());
+            case AUTOMATIC, IMPORTED -> validator.validateStrictOverlap(candidates);
+            case SYSACAD -> { }
         }
         return classrooms;
     }

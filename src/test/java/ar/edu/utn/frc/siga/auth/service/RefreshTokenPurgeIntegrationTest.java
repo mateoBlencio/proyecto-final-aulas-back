@@ -57,7 +57,29 @@ class RefreshTokenPurgeIntegrationTest extends AbstractIntegrationTest {
         assertThat(refreshTokenRepository.findByTokenHash("active")).isPresent();
     }
 
-    private void save(String hash, Instant expiresAt) {
-        refreshTokenRepository.save(RefreshToken.builder().user(user).tokenHash(hash).expiresAt(expiresAt).build());
+    @Test
+    void purgeExpired_whenAnotherTokenReferencesTheExpiredOne_doesNotFailAndClearsReplacedBy() {
+        user = userRepository.save(User.builder()
+                .email("purge.replaced@frc.utn.edu.ar").passwordHash("irrelevant").enabled(true)
+                .firstName("Purge").lastName("Replaced").build());
+        Instant now = Instant.now();
+        RefreshToken expired = save("expiredReplaced", now.minus(Duration.ofDays(31)));
+        RefreshToken successor = save("successor", now.plus(Duration.ofDays(5)));
+        successor.setReplacedBy(expired);
+        refreshTokenRepository.save(successor);
+
+        int deleted = refreshTokenService.purgeExpired();
+
+        assertThat(deleted).isGreaterThanOrEqualTo(1);
+        assertThat(refreshTokenRepository.findByTokenHash("expiredReplaced")).isEmpty();
+        assertThat(refreshTokenRepository.findByTokenHash("successor")).isPresent();
+        assertThat(jdbc.queryForObject(
+                "select reemplazado_por from refresh_token where token_hash = ?", Long.class, "successor"))
+                .isNull();
+    }
+
+    private RefreshToken save(String hash, Instant expiresAt) {
+        return refreshTokenRepository.save(
+                RefreshToken.builder().user(user).tokenHash(hash).expiresAt(expiresAt).build());
     }
 }

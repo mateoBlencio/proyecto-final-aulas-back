@@ -2,12 +2,18 @@ package ar.edu.utn.frc.siga.audit;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import ar.edu.utn.frc.siga.settings.model.SettingKey;
+import ar.edu.utn.frc.siga.settings.service.SettingsStore;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,7 +26,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Audit export: límite max-rows (integración)")
 class AuditRegistryExportLimitIntegrationTest extends AbstractIntegrationTest {
 
+    @Autowired
+    private SettingsStore settingsStore;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private String originalHoursEnd;
+
+    @AfterEach
+    void restoreHoursEnd() {
+        if (originalHoursEnd != null) {
+            new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                    settingsStore.write(SettingKey.EVENTS_HOURS_END, originalHoursEnd));
+            originalHoursEnd = null;
+        }
+    }
+
     private void bumpSetting(String value) throws Exception {
+        if (originalHoursEnd == null) {
+            originalHoursEnd = settingsStore.getRaw(SettingKey.EVENTS_HOURS_END);
+        }
         mockMvc.perform(put("/v1/settings/{key}", "events.hours.end")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"" + value + "\"}"))

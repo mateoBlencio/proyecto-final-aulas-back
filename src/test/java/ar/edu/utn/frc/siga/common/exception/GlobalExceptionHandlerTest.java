@@ -6,6 +6,8 @@ import jakarta.validation.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.data.core.PropertyPath;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,7 @@ import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -170,6 +173,19 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("PropertyReferenceException se traduce a 400 'Propiedad de orden inválida' con la propiedad pedida")
+    void propertyReferenceExceptionMapsTo400() {
+        PropertyReferenceException ex = catchThrowableOfType(PropertyReferenceException.class,
+                () -> PropertyPath.from("nope", Sample.class));
+
+        ProblemDetail problem = handler.handleInvalidSortProperty(ex);
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getTitle()).isEqualTo("Propiedad de orden inválida");
+        assertThat(problem.getDetail()).isEqualTo("No se puede ordenar por 'nope'.");
+    }
+
+    @Test
     @DisplayName("MaxUploadSizeExceededException se traduce a 413")
     void maxUploadSizeExceededExceptionMapsTo413() {
         ProblemDetail problem = handler.handleMaxUploadSize(new MaxUploadSizeExceededException(1024L));
@@ -223,6 +239,12 @@ class GlobalExceptionHandlerTest {
     @SuppressWarnings("unused")
     private void dummyTarget(String param) {
         // método de soporte para construir un MethodParameter real en los tests
+    }
+
+    /** Tipo de soporte para provocar una PropertyReferenceException real al resolver una propiedad inexistente. */
+    @SuppressWarnings("unused")
+    private static final class Sample {
+        private String name;
     }
 
     /** Subtipo de {@link SigaAppException} de uso exclusivo en tests, para probar la genericidad del handler. */

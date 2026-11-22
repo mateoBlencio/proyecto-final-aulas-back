@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.ingest;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
@@ -17,6 +18,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks.DataRow;
 import ar.edu.utn.frc.siga.ingest.dto.IngestResultDto;
+import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
@@ -247,5 +249,125 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Import error"));
 
         assertThat(eventRepository.count()).isEqualTo(eventsBefore);
+    }
+
+    private record SharedCatalog(StudyPlan plan, Building building) {
+    }
+
+    /** Especialidad, plan, edificio, aula y período del año; sin materia ni evento, que los crea la importación. */
+    private SharedCatalog seedSharedCatalog(DataRow row, int year) {
+        var specialty = integrationTestData.especialidad(row.specialtyCode());
+        StudyPlan plan = integrationTestData.planDeEstudio(row.studyPlanCode(), specialty);
+        Building building = integrationTestData.edificioConNombre(row.buildingName());
+        integrationTestData.aulaConNumero((Integer) row.roomNumber(), building,
+                integrationTestData.tipoAulaPorDefecto(), row.enrolledCount());
+        integrationTestData.periodoAcademico(year, TermType.ANUAL);
+        return new SharedCatalog(plan, building);
+    }
+
+    /** Materia y comisión de la fila, sin evento: la importación lo crea. */
+    private void seedSubjectWithoutEvent(DataRow row, StudyPlan plan, int year) {
+        Subject subject = integrationTestData.materia(row.subjectCode(), row.subjectName(), plan, row.termType());
+        AcademicPeriod period = integrationTestData.periodoAcademico(year, TermType.ANUAL);
+        Commission commission = integrationTestData.comision(row.courseCode(), period);
+        integrationTestData.materiaComision(subject, commission, row.enrolledCount());
+    }
+
+    private DataRow otherSubjectSameRoom(DataRow row) {
+        long seq = IntegrationTestData.nextSeq();
+        return row.toBuilder()
+                .courseCode("6" + seq)
+                .subjectCode((int) seq)
+                .subjectName("Materia-IT-" + seq)
+                .build();
+    }
+
+    private long allocationsInClassroom(Classroom classroom) {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM asignacion_aula WHERE id_aula = ?", Long.class, classroom.getId());
+        return count == null ? 0 : count;
+    }
+
+    @Test
+    @DisplayName("ING-ATOM: una fila que choca con una asignación futura responde 409 y no deja eventos creados (todo o nada)")
+    void importExcel_allocationConflict_returns409AndCreatesNoEvents() throws Exception {
+        int year = 3101;
+        DataRow blocker = uniqueRow(uniqueBuilding());
+        SharedCatalog catalog = seedSharedCatalog(blocker, year);
+        seedSubjectWithoutEvent(blocker, catalog.plan(), year);
+        DataRow clashing = otherSubjectSameRoom(blocker);
+        seedSubjectWithoutEvent(clashing, catalog.plan(), year);
+        mockMvc.perform(multipart("/v1/imports")
+                        .file(ExcelTestWorkbooks.validTemplate(year).withDataRow(blocker).toMultipartFile()))
+                .andExpect(status().isOk());
+        long eventsBefore = eventRepository.count();
+
+        mockMvc.perform(multipart("/v1/imports")
+                        .file(ExcelTestWorkbooks.validTemplate(year).withDataRow(clashing).toMultipartFile()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Reallocation conflict"));
+
+        assertThat(eventRepository.count()).isEqualTo(eventsBefore);
+    }
+
+    @Test
+    @DisplayName("ING-ATOM: una fila con aula inexistente responde 200, queda en skippedRows y el resto se persiste")
+    void importExcel_unknownClassroom_skipsRowAndPersistsTheRest() throws Exception {
+        int year = 3102;
+        DataRow valid = uniqueRow(uniqueBuilding());
+        SharedCatalog catalog = seedSharedCatalog(valid, year);
+        seedSubjectWithoutEvent(valid, catalog.plan(), year);
+        DataRow unknownRoom = otherSubjectSameRoom(valid).toBuilder().roomNumber(((Integer) valid.roomNumber()) + 900_000).build();
+        seedSubjectWithoutEvent(unknownRoom, catalog.plan(), year);
+        long eventsBefore = eventRepository.count();
+
+        MvcResult result = mockMvc.perform(multipart("/v1/imports")
+                        .file(ExcelTestWorkbooks.validTemplate(year).withDataRow(valid).withDataRow(unknownRoom).toMultipartFile()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        IngestResultDto response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), IngestResultDto.class);
+        assertThat(response.processedRows()).isEqualTo(1);
+        assertThat(response.skippedRows()).hasSize(1);
+        assertThat(response.skippedRows().getFirst().row()).isEqualTo(8);
+        assertThat(response.rowWarnings()).isEmpty();
+        assertThat(eventRepository.count()).isEqualTo(eventsBefore + 1);
+        Classroom classroom = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull((Integer) valid.roomNumber()).getFirst();
+        assertThat(allocationsInClassroom(classroom)).isPositive();
+    }
+
+    @Test
+    @DisplayName("ING-01: dos filas del mismo evento con aulas distintas responden 200 con una advertencia por fila y sin asignación")
+    void importExcel_sameEventTwoClassrooms_warnsEachRowAndAllocatesNothing() throws Exception {
+        int year = 3103;
+        DataRow rowInFirstRoom = uniqueRow(uniqueBuilding());
+        SharedCatalog catalog = seedSharedCatalog(rowInFirstRoom, year);
+        seedSubjectWithoutEvent(rowInFirstRoom, catalog.plan(), year);
+        int secondRoomNumber = ((Integer) rowInFirstRoom.roomNumber()) + 900_000;
+        integrationTestData.aulaConNumero(secondRoomNumber, catalog.building(),
+                integrationTestData.tipoAulaPorDefecto(), rowInFirstRoom.enrolledCount());
+        DataRow rowInSecondRoom = rowInFirstRoom.toBuilder().roomNumber(secondRoomNumber).build();
+        long eventsBefore = eventRepository.count();
+
+        MvcResult result = mockMvc.perform(multipart("/v1/imports")
+                        .file(ExcelTestWorkbooks.validTemplate(year)
+                                .withDataRow(rowInFirstRoom).withDataRow(rowInSecondRoom).toMultipartFile()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        IngestResultDto response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), IngestResultDto.class);
+        assertThat(response.processedRows()).isEqualTo(2);
+        assertThat(response.skippedRows()).isEmpty();
+        assertThat(response.rowWarnings()).extracting(w -> w.row()).containsExactly(7, 8);
+        assertThat(response.rowWarnings()).allSatisfy(w -> assertThat(w.message())
+                .contains("mismo evento").contains("no se asignó ninguna"));
+        assertThat(eventRepository.count()).isEqualTo(eventsBefore + 1);
+        Classroom firstRoom = classroomRepository
+                .findAllByRoomNumberAndDeletedAtIsNull((Integer) rowInFirstRoom.roomNumber()).getFirst();
+        Classroom secondRoom = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(secondRoomNumber).getFirst();
+        assertThat(allocationsInClassroom(firstRoom)).isZero();
+        assertThat(allocationsInClassroom(secondRoom)).isZero();
     }
 }

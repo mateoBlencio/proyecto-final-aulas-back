@@ -60,6 +60,14 @@ public class EmailChannelSender implements ChannelSender {
             helper.setSubject(stripHeaderInjection(message.subject()));
             helper.setText(message.body(), true);
             setReplyTo(mimeMessage, message.replyTo());
+            InternetAddress[] cc = validAddresses(message.cc(), "CC");
+            if (cc.length > 0) {
+                helper.setCc(cc);
+            }
+            InternetAddress[] bcc = validAddresses(message.bcc(), "CCO");
+            if (bcc.length > 0) {
+                helper.setBcc(bcc);
+            }
             for (Map.Entry<String, String> image : INLINE_IMAGES.entrySet()) {
                 if (message.body().contains("cid:" + image.getKey())) {
                     helper.addInline(image.getKey(), new ClassPathResource(image.getValue()));
@@ -75,9 +83,20 @@ public class EmailChannelSender implements ChannelSender {
             // La causa distingue un 535 de autenticación, un certificado rechazado o un timeout en ultimo_error.
             // El servidor puede repetir el destinatario ("550 5.1.1 <docente@...>"): se enmascara igual.
             Throwable cause = e.getMostSpecificCause();
-            String detail = cause.getMessage() == null ? null
-                    : Pattern.compile(Pattern.quote(address), Pattern.CASE_INSENSITIVE).matcher(cause.getMessage())
-                            .replaceAll(Matcher.quoteReplacement(mask(address)));
+            // Lo mismo vale para las copias: el servidor también puede repetir una dirección de CC o CCO.
+            String detail = cause.getMessage();
+            if (detail != null) {
+                List<String> echoed = new ArrayList<>(List.of(address));
+                echoed.addAll(message.cc());
+                echoed.addAll(message.bcc());
+                for (String echo : echoed) {
+                    if (echo.isBlank()) {
+                        continue;
+                    }
+                    detail = Pattern.compile(Pattern.quote(echo.strip()), Pattern.CASE_INSENSITIVE).matcher(detail)
+                            .replaceAll(Matcher.quoteReplacement(mask(echo.strip())));
+                }
+            }
             // Sin encadenar la causa: su mensaje trae la dirección sin enmascarar y saldría en el stack trace.
             throw new IllegalStateException("No se pudo enviar el mail a " + mask(address) + ": "
                     + cause.getClass().getSimpleName() + ": " + detail);
@@ -86,18 +105,24 @@ public class EmailChannelSender implements ChannelSender {
     }
 
     private static void setReplyTo(MimeMessage mimeMessage, List<String> replyTo) throws MessagingException {
+        InternetAddress[] addresses = validAddresses(replyTo, "Reply-To");
+        if (addresses.length > 0) {
+            mimeMessage.setReplyTo(addresses);
+        }
+    }
+
+    /** Las direcciones con formato válido; las inválidas se descartan con un aviso y no frenan el envío. */
+    private static InternetAddress[] validAddresses(List<String> candidates, String header) {
         List<InternetAddress> addresses = new ArrayList<>();
-        for (String address : replyTo) {
+        for (String address : candidates) {
             Optional<InternetAddress> parsed = EmailAddressFormat.parse(address.strip());
             if (parsed.isPresent()) {
                 addresses.add(parsed.get());
             } else {
-                log.warn("Reply-To descartado por dirección inválida: {}", mask(address.strip()));
+                log.warn("{} descartado por dirección inválida: {}", header, mask(address.strip()));
             }
         }
-        if (!addresses.isEmpty()) {
-            mimeMessage.setReplyTo(addresses.toArray(InternetAddress[]::new));
-        }
+        return addresses.toArray(InternetAddress[]::new);
     }
 
     private static String stripHeaderInjection(String value) {

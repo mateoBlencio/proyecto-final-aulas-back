@@ -34,6 +34,8 @@ class AllocationTargetResolver {
     // Una ocurrencia liberada es una decisión humana: ningún camino que escribe asignaciones la pisa
     // (decisiones D3 y D9), sea cual sea la forma del target. La liberada por baja de aula
     // (CLASSROOM_DEACTIVATED) se reasigna directo solo cuando el llamador lo pide.
+    // Los targets Event y EventRange resuelven solo la ocurrencia principal: las aulas adicionales
+    // (espejos) conservan la suya.
     ResolvedAssignments resolveClassroomByOccurrence(List<AllocationItem> items, LocalDate clampFrom,
             boolean reassignDeactivationReleases) {
         Map<Long, List<OccurrenceSlotDto>> slotsByEvent = collectSlotsByEvent(
@@ -42,7 +44,7 @@ class AllocationTargetResolver {
         Set<OccurrenceSlotDto> skippedReleased = new LinkedHashSet<>();
         Set<OccurrenceSlotDto> reactivated = new LinkedHashSet<>();
         for (AllocationItem item : items) {
-            for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom, slotsByEvent)) {
+            for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom, slotsByEvent, true)) {
                 if (occurrence.status() == OccurrenceStatus.ROOM_RELEASED) {
                     if (!reassignDeactivationReleases || occurrence.blocksAllocation()) {
                         skippedReleased.add(occurrence);
@@ -65,7 +67,7 @@ class AllocationTargetResolver {
         Map<Long, List<OccurrenceSlotDto>> slotsByEvent = collectSlotsByEvent(targets, clampFrom);
         Set<OccurrenceSlotDto> occurrences = new LinkedHashSet<>();
         for (AllocationTarget target : targets) {
-            occurrences.addAll(resolveApplicable(target, clampFrom, slotsByEvent));
+            occurrences.addAll(resolveApplicable(target, clampFrom, slotsByEvent, false));
         }
         return List.copyOf(occurrences);
     }
@@ -87,7 +89,7 @@ class AllocationTargetResolver {
     }
 
     private List<OccurrenceSlotDto> resolveApplicable(AllocationTarget target, LocalDate clampFrom,
-            Map<Long, List<OccurrenceSlotDto>> slotsByEvent) {
+            Map<Long, List<OccurrenceSlotDto>> slotsByEvent, boolean principalsOnly) {
         return switch (target) {
             case AllocationTarget.Occurrences(List<Long> occurrenceIds) -> {
                 List<OccurrenceSlotDto> occurrences = occurrenceService.findSlots(occurrenceIds);
@@ -97,6 +99,7 @@ class AllocationTargetResolver {
             }
             case AllocationTarget.Event(Long eventId) -> slotsByEvent.getOrDefault(eventId, List.of())
                     .stream()
+                    .filter(o -> !principalsOnly || o.mirrorOfOccurrenceId() == null)
                     .filter(o -> clampFrom == null || !o.isPast())
                     .toList();
             case AllocationTarget.EventRange(Long eventId, LocalDate from, LocalDate to) -> {
@@ -107,6 +110,7 @@ class AllocationTargetResolver {
                 // Un cambio "desde hoy" omite la clase de hoy si ya empezó, igual que el target Event.
                 LocalDate effectiveFrom = from.isBefore(LocalDate.now()) ? LocalDate.now() : from;
                 yield occurrenceService.findSlotsByEvent(eventId, effectiveFrom).stream()
+                        .filter(o -> !principalsOnly || o.mirrorOfOccurrenceId() == null)
                         .filter(o -> to == null || !o.date().isAfter(to))
                         .filter(o -> !o.isPast())
                         .toList();

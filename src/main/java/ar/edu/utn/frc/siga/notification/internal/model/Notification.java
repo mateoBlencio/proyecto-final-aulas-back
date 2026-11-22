@@ -74,6 +74,13 @@ public class Notification extends TimestampedEntity {
     @Column(name = "responder_a", columnDefinition = "text")
     private String replyTo;
 
+    @Column(name = "cc", columnDefinition = "text")
+    private String cc;
+
+    /** Copia oculta: las direcciones quedan guardadas en claro, igual que {@code destinatario}. */
+    @Column(name = "cco", columnDefinition = "text")
+    private String bcc;
+
     @Column(name = "clave_idempotencia", nullable = false, length = 120)
     private String idempotencyKey;
 

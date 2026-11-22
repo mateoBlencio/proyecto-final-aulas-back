@@ -126,6 +126,18 @@ public final class ExcelTestWorkbooks {
         return this;
     }
 
+    /** Escribe la fórmula y la evalúa, para que la celda tenga resultado cacheado como un archivo guardado por Excel. */
+    public ExcelTestWorkbooks withFormulaCell(int rowIndex, int columnIndex, String formula) {
+        Row row = sheet.getRow(rowIndex);
+        Cell cell = row.getCell(columnIndex);
+        if (cell == null) {
+            cell = row.createCell(columnIndex);
+        }
+        cell.setCellFormula(formula);
+        workbook.getCreationHelper().createFormulaEvaluator().evaluateFormulaCell(cell);
+        return this;
+    }
+
     public ExcelTestWorkbooks truncateHeaderColumns(int columnCount) {
         Row headerRow = sheet.getRow(HEADER_ROW_INDEX);
         for (int i = headerRow.getLastCellNum() - 1; i >= columnCount; i--) {

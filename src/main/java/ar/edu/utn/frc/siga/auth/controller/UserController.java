@@ -54,9 +54,10 @@ public class UserController {
     @PatchMapping("/{id}/enabled")
     @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public ResponseEntity<UserResponseDto> setEnabled(@PathVariable Long id,
-                                                      @Valid @RequestBody UpdateUserEnabledRequestDto dto) {
+                                                      @Valid @RequestBody UpdateUserEnabledRequestDto dto,
+                                                      @AuthenticationPrincipal SecurityUser principal) {
         log.debug("PATCH /v1/users/{}/enabled: enabled={}", id, dto.enabled());
-        UserResponseDto response = userService.setEnabled(id, dto.enabled());
+        UserResponseDto response = userService.setEnabled(id, dto.enabled(), principal.getEmail());
         log.info("Estado de usuario actualizado vía controller: id={}, enabled={}", response.id(), dto.enabled());
         return ResponseEntity.ok(response);
     }

@@ -1,10 +1,7 @@
 package ar.edu.utn.frc.siga.preview.validator;
 
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
-import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.preview.service.impl.PlanningKey;
@@ -191,52 +188,6 @@ class PreviewValidatorTest {
 
         assertThatCode(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(new PlanningKey(1L, 1))))
                 .doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("validateNoSiblingRoomClash: dos roomSlot del mismo evento en la misma aula y fecha lanza AllocationConflictException")
-    void validateNoSiblingRoomClashMismaAulaYFechaLanza() {
-        LocalDate date = futureDate(3);
-        List<AllocationCandidate> candidates = List.of(
-                candidate(10L, 1L, date, 1, 5L), candidate(11L, 1L, date, 2, 5L));
-
-        assertThatThrownBy(() -> validator.validateNoSiblingRoomClash(candidates))
-                .isInstanceOf(AllocationConflictException.class);
-    }
-
-    @Test
-    @DisplayName("validateNoSiblingRoomClash: dos roomSlot del mismo evento en aulas distintas no lanza")
-    void validateNoSiblingRoomClashAulasDistintasNoLanza() {
-        LocalDate date = futureDate(3);
-        List<AllocationCandidate> candidates = List.of(
-                candidate(10L, 1L, date, 1, 5L), candidate(11L, 1L, date, 2, 6L));
-
-        assertThatCode(() -> validator.validateNoSiblingRoomClash(candidates)).doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("validateNoSiblingRoomClash: misma aula en fechas distintas no lanza")
-    void validateNoSiblingRoomClashFechasDistintasNoLanza() {
-        List<AllocationCandidate> candidates = List.of(
-                candidate(10L, 1L, futureDate(3), 1, 5L), candidate(11L, 1L, futureDate(10), 2, 5L));
-
-        assertThatCode(() -> validator.validateNoSiblingRoomClash(candidates)).doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("validateNoSiblingRoomClash: eventos distintos en la misma aula y fecha no son de este validador")
-    void validateNoSiblingRoomClashEventosDistintosNoLanza() {
-        LocalDate date = futureDate(3);
-        List<AllocationCandidate> candidates = List.of(
-                candidate(10L, 1L, date, 1, 5L), candidate(20L, 2L, date, 1, 5L));
-
-        assertThatCode(() -> validator.validateNoSiblingRoomClash(candidates)).doesNotThrowAnyException();
-    }
-
-    private AllocationCandidate candidate(Long occurrenceId, Long eventId, LocalDate date, int roomSlot,
-            Long classroomId) {
-        return new AllocationCandidate(new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0),
-                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, roomSlot, null, null, null, null), classroomId);
     }
 
     private LocalDate futureDate(int daysFromNow) {

@@ -10,8 +10,9 @@ public record DashboardParameters(
         return hoursStart.toSecondOfDay() / 60;
     }
 
+    /** Fin 00:00 equivale a fin de día (1440). */
     public int endMinute() {
-        return hoursEnd.toSecondOfDay() / 60;
+        return LocalTime.MIDNIGHT.equals(hoursEnd) ? 24 * 60 : hoursEnd.toSecondOfDay() / 60;
     }
 
     /** First hour of the profile (inclusive). */

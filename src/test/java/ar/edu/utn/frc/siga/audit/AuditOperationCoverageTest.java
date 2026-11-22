@@ -50,7 +50,6 @@ class AuditOperationCoverageTest {
 
     /** Key {@code Class#method}; the value is the reason it carries no annotation. */
     private static final Map<String, String> EXCEPTIONS = Map.ofEntries(
-            Map.entry("AuthServiceImpl#login", "writes no audited entities (refresh tokens are not @Audited)"),
             Map.entry("AuthServiceImpl#refresh", "writes no audited entities (refresh tokens are not @Audited)"),
             Map.entry("AuthServiceImpl#logout", "writes no audited entities (refresh tokens are not @Audited)"),
             Map.entry("RoomRequestExpiryScheduler#expireOverdueItems",
@@ -74,14 +73,15 @@ class AuditOperationCoverageTest {
             Map.entry("AuditArchiveRepository#tryLock",
                     "propagation MANDATORY, only takes an advisory lock and writes nothing"),
             Map.entry("ClassroomAllocationLock#lock", "propagation MANDATORY, only takes an advisory lock and writes nothing"),
-            Map.entry("IngestRowResolver#resolveRefs",
-                    "runs inside IngestServiceImpl.ingestFile, which opens the operation"),
             Map.entry("SysacadScheduleLoader#load",
                     "only writes sysacad_horario, which is not @Audited; its own log table keeps the history"),
             Map.entry("RecurringEventReconciler#reconcileFuture",
                     "its only caller is AcademicPeriodChangedListener.on, which carries the annotation"),
             Map.entry("RecurringEventReconciler#retireFuture",
-                    "its only caller is AcademicEventServiceImpl.syncRecurringEvents, which carries the annotation"));
+                    "its only caller is AcademicEventServiceImpl.syncRecurringEvents, which carries the annotation"),
+            Map.entry("AllocationServiceImpl#revalidateRescheduled",
+                    "its only caller is UniqueEventRescheduledListener.on, which runs inside"
+                            + " AcademicEventServiceImpl.updateUniqueEvent, which carries the annotation"));
 
     @Test
     @DisplayName("todo punto de escritura tiene @AuditOperation o una excepción justificada")

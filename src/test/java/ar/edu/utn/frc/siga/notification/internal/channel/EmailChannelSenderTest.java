@@ -273,6 +273,123 @@ class EmailChannelSenderTest {
     }
 
     @Test
+    void setsCcAndBccOnTheMessageAndKeepsToWithOnlyTheRecipient() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Propuesta de aula", "<p>cuerpo</p>",
+                List.of(), List.of("auxiliar@frc.utn.edu.ar"),
+                List.of("subsecretaria1@frc.utn.edu.ar", "subsecretaria2@frc.utn.edu.ar"));
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getRecipients(Message.RecipientType.TO)).extracting(Object::toString)
+                .containsExactly("docente@frc.utn.edu.ar");
+        assertThat(mimeMessage.getRecipients(Message.RecipientType.CC)).extracting(Object::toString)
+                .containsExactly("auxiliar@frc.utn.edu.ar");
+        assertThat(mimeMessage.getRecipients(Message.RecipientType.BCC)).extracting(Object::toString)
+                .containsExactly("subsecretaria1@frc.utn.edu.ar", "subsecretaria2@frc.utn.edu.ar");
+        verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
+    void discardsInvalidCcAndBccAddressesWithMaskedWarningsAndStillSendsTheMail() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Propuesta de aula", "<p>cuerpo</p>", List.of(),
+                List.of("secacad-gestionaulas", "aux..doble@frc.utn.edu.ar", "auxiliar@frc.utn.edu.ar"),
+                List.of("uno@frc.utn.edu.ar,dos@frc.utn.edu.ar", "subsecretaria@frc.utn.edu.ar"));
+
+        List<String> warnings = warningsWhileSending(message);
+
+        assertThat(mimeMessage.getRecipients(Message.RecipientType.CC)).extracting(Object::toString)
+                .containsExactly("auxiliar@frc.utn.edu.ar");
+        assertThat(mimeMessage.getRecipients(Message.RecipientType.BCC)).extracting(Object::toString)
+                .containsExactly("subsecretaria@frc.utn.edu.ar");
+        assertThat(warnings).containsExactlyInAnyOrder(
+                "CC descartado por dirección inválida: ***",
+                "CC descartado por dirección inválida: a***@frc.utn.edu.ar",
+                "CCO descartado por dirección inválida: u***@frc.utn.edu.ar,dos@frc.utn.edu.ar");
+        verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
+    void discardsACcAddressCarryingAHeaderInjectionAttempt() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Propuesta de aula", "<p>cuerpo</p>", List.of(),
+                List.of("auxiliar@frc.utn.edu.ar\nBcc: externo@mail.com"), List.of());
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getHeader("Cc")).isNull();
+        assertThat(mimeMessage.getHeader("Bcc")).isNull();
+        verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
+    void setsNoCcOrBccHeaderWhenTheListsAreEmpty() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Propuesta de aula", "<p>cuerpo</p>", List.of(),
+                List.of(), List.of());
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getHeader("Cc")).isNull();
+        assertThat(mimeMessage.getHeader("Bcc")).isNull();
+        verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
+    void setsNoCcOrBccHeaderWhenTheThreeArgumentConstructorIsUsed() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Propuesta de aula", "<p>cuerpo</p>", List.of());
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getHeader("Cc")).isNull();
+        assertThat(mimeMessage.getHeader("Bcc")).isNull();
+    }
+
+    @Test
+    void masksACcAndABccAddressEchoedByTheSmtpServerRegardlessOfCase() {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        org.mockito.Mockito.doThrow(new MailSendException(Map.of(mimeMessage, new SendFailedException(
+                        "550 5.1.1 <Auxiliar@FRC.utn.edu.ar> unknown; 550 5.1.1 <SUBSECRETARIA@frc.utn.edu.ar> unknown"))))
+                .when(mailSender).send(any(MimeMessage.class));
+        RenderedNotification message = new RenderedNotification("Propuesta de aula", "<p>cuerpo</p>", List.of(),
+                List.of("auxiliar@frc.utn.edu.ar"), List.of("subsecretaria@frc.utn.edu.ar"));
+
+        assertThatThrownBy(() -> sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("<a***@frc.utn.edu.ar> unknown")
+                .hasMessageContaining("<s***@frc.utn.edu.ar> unknown")
+                .hasNoCause()
+                .satisfies(e -> assertThat(e.getMessage())
+                        .doesNotContainIgnoringCase("auxiliar@frc.utn.edu.ar")
+                        .doesNotContainIgnoringCase("subsecretaria@frc.utn.edu.ar"));
+    }
+
+    private List<String> warningsWhileSending(RenderedNotification message) {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(EmailChannelSender.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return appender.list.stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
+    }
+
+    @Test
     void attachesBothLogosInlineWhenBodyReferencesTheirCids() throws Exception {
         MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
