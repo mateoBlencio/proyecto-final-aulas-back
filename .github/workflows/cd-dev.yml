@@ -83,6 +83,9 @@ jobs:
             echo "::error::No se extrajo ninguna variable para backend-dev; revisar el chequeo"
             exit 1
           fi
+          # compose lo declara como ${TRUSTED_PROXIES:-} (no falla si falta) y el filtro de ':-'
+          # lo descarta; sin el, los rate limits por IP afectan a todos los usuarios tras nginx.
+          required=$(printf '%s\nTRUSTED_PROXIES\n' "$required" | sort -u)
           # Un secret vacio esta tan roto como uno ausente: solo se toleran las
           # que legitimamente pueden ir en blanco.
           allow_empty=" SYSACAD_API_KEY "

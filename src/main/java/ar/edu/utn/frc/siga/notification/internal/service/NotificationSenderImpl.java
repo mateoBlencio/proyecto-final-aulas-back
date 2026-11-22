@@ -34,6 +34,8 @@ class NotificationSenderImpl implements NotificationSender {
     private static final Map<NotificationChannel, SettingKey> CHANNEL_TOGGLES =
             Map.of(NotificationChannel.EMAIL, SettingKey.NOTIFICATIONS_CHANNEL_EMAIL_ENABLED);
 
+    private static final int MAX_SUBJECT_LENGTH = 255;
+
     private final SettingsReader settingsReader;
     private final ChannelRegistry channelRegistry;
     private final NotificationRenderer renderer;
@@ -122,6 +124,13 @@ class NotificationSenderImpl implements NotificationSender {
         }
     }
 
+    /** La columna {@code asunto} es varchar(255): un asunto más largo haría fallar el insert y tiraría todo el envío. */
+    private static String truncateSubject(String subject) {
+        return subject != null && subject.length() > MAX_SUBJECT_LENGTH
+                ? subject.substring(0, MAX_SUBJECT_LENGTH)
+                : subject;
+    }
+
     private static Notification newNotification(
             NotificationRequest request,
             NotificationChannel channel,
@@ -133,7 +142,7 @@ class NotificationSenderImpl implements NotificationSender {
                 .channel(channel)
                 .recipient(recipient.email())
                 .recipientName(recipient.displayName())
-                .subject(rendered.subject())
+                .subject(truncateSubject(rendered.subject()))
                 .body(rendered.body())
                 .replyTo(replyTo)
                 .cc(resolveCc(request))

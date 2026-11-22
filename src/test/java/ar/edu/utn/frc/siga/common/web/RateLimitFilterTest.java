@@ -3,12 +3,18 @@ package ar.edu.utn.frc.siga.common.web;
 import ar.edu.utn.frc.siga.common.config.CorsProperties;
 import ar.edu.utn.frc.siga.common.config.GeneralRateLimitProperties;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.PrintWriter;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,13 +46,32 @@ class RateLimitFilterTest {
         when(request.getMethod()).thenReturn(method);
         when(request.getRemoteAddr()).thenReturn(ip);
         when(request.getHeader("Origin")).thenReturn(ORIGIN);
+        when(request.getRequestURI()).thenReturn("/api/v1/buildings");
         return request;
     }
 
     private HttpServletResponse responseMock() throws Exception {
         HttpServletResponse response = mock(HttpServletResponse.class);
-        when(response.getWriter()).thenReturn(mock(PrintWriter.class));
+        when(response.getOutputStream()).thenReturn(mock(ServletOutputStream.class));
         return response;
+    }
+
+    private static ServletOutputStream capturing(ByteArrayOutputStream sink) {
+        return new ServletOutputStream() {
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setWriteListener(WriteListener listener) {
+            }
+
+            @Override
+            public void write(int b) {
+                sink.write(b);
+            }
+        };
     }
 
     @Test
@@ -74,6 +99,29 @@ class RateLimitFilterTest {
         verify(response).setStatus(429);
         verify(response, org.mockito.Mockito.atLeastOnce()).setHeader("Access-Control-Allow-Origin", ORIGIN);
         verify(response, org.mockito.Mockito.atLeastOnce()).setHeader(anyString(), anyString());
+    }
+
+    @Test
+    void the429BodyIsAProblemDetailWithTheSameShapeAsTheHandlerErrors() throws Exception {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(response.getOutputStream()).thenReturn(capturing(body));
+        FilterChain chain = mock(FilterChain.class);
+        String ip = "10.0.0.4";
+
+        filter.doFilter(request("GET", ip), response, chain);
+        filter.doFilter(request("GET", ip), response, chain);
+        filter.doFilter(request("GET", ip), response, chain);
+
+        verify(response).setContentType("application/problem+json");
+        verify(response).setHeader(org.mockito.ArgumentMatchers.eq("Retry-After"), anyString());
+        JsonNode json = JsonMapper.builder().build().readTree(body.toString(StandardCharsets.UTF_8));
+        List<String> keys = new ArrayList<>();
+        json.propertyNames().forEach(keys::add);
+        assertThat(keys).containsExactlyInAnyOrder("detail", "instance", "status", "title");
+        assertThat(json.get("status").asInt()).isEqualTo(429);
+        assertThat(json.get("title").asString()).isEqualTo("Too many requests");
+        assertThat(json.get("instance").asString()).isEqualTo("/api/v1/buildings");
     }
 
     @Test

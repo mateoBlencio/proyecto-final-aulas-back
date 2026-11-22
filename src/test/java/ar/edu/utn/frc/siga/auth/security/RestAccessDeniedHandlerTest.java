@@ -16,10 +16,15 @@ class RestAccessDeniedHandlerTest {
     void responde403EnEspanol() throws IOException {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        new RestAccessDeniedHandler().handle(new MockHttpServletRequest(), response, new AccessDeniedException("x"));
+        new RestAccessDeniedHandler().handle(new MockHttpServletRequest("GET", "/api/v1/x"), response,
+                new AccessDeniedException("x"));
 
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(response.getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
-                .contains("No tenés permiso para acceder a este recurso.");
+                .contains("No tenés permiso para acceder a este recurso.")
+                .contains("\"instance\":\"/api/v1/x\"")
+                .doesNotContain("\"type\"")
+                .doesNotContain("null");
+        assertThat(response.getContentType()).startsWith("application/problem+json");
     }
 }

@@ -229,6 +229,56 @@ class ChannelResolverTest {
         assertThat(savedFromFive.getReplyTo()).isEqualTo("aux@frc.utn.edu.ar");
     }
 
+    @Test
+    void truncatesASubjectOf300CharactersTo255KeepingThePrefix() {
+        String subject = "A".repeat(100) + "B".repeat(100) + "C".repeat(100);
+
+        Notification saved = queueWithSubject(subject);
+
+        assertThat(saved.getSubject()).hasSize(255).isEqualTo(subject.substring(0, 255));
+    }
+
+    @Test
+    void truncatesASubjectOf256CharactersTo255() {
+        assertThat(queueWithSubject("x".repeat(256)).getSubject()).hasSize(255);
+    }
+
+    @Test
+    void keepsASubjectOfExactly255CharactersIntact() {
+        String subject = "y".repeat(255);
+
+        assertThat(queueWithSubject(subject).getSubject()).isEqualTo(subject);
+    }
+
+    @Test
+    void keepsASubjectOf254CharactersIntact() {
+        String subject = "z".repeat(254);
+
+        assertThat(queueWithSubject(subject).getSubject()).isEqualTo(subject);
+    }
+
+    @Test
+    void keepsAShortSubjectIntact() {
+        assertThat(queueWithSubject("Aula confirmada").getSubject()).isEqualTo("Aula confirmada");
+    }
+
+    private Notification queueWithSubject(String subject) {
+        when(settingsReader.getBoolean(SettingKey.NOTIFICATIONS_ENABLED)).thenReturn(true);
+        when(settingsReader.getBoolean(SettingKey.NOTIFICATIONS_CHANNEL_EMAIL_ENABLED)).thenReturn(true);
+        when(renderer.render(any(), any())).thenReturn(new RenderedNotification(subject, "<p>cuerpo</p>", List.of()));
+        when(repository.save(any(Notification.class))).thenAnswer(inv -> inv.getArgument(0));
+        ChannelSender email = org.mockito.Mockito.mock(ChannelSender.class);
+        when(email.channel()).thenReturn(NotificationChannel.EMAIL);
+        NotificationSenderImpl sender = new NotificationSenderImpl(
+                settingsReader, new ChannelRegistry(List.of(email)), renderer, repository, eventPublisher, properties);
+
+        sender.send(request);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(repository).save(captor.capture());
+        return captor.getValue();
+    }
+
     private NotificationRequest copies(List<String> cc, List<String> bcc) {
         return new NotificationRequest(request.template(), request.recipients(), request.model(),
                 request.idempotencyKey(), List.of(), cc, bcc);

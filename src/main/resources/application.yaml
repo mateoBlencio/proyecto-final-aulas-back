@@ -13,6 +13,12 @@ spring:
         max-page-size: 200
         default-page-size: 20
 
+  # Hay 8 @Scheduled: con el pool por defecto (1 hilo) una tarea lenta atrasa a las demás.
+  task:
+    scheduling:
+      pool:
+        size: 4
+
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USERNAME}

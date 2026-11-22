@@ -147,6 +147,62 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /seen con un lastSeenId gigante da 204, se acota al maximo en alcance y la actividad posterior sigue contando")
+    void hugeLastSeenIdIsCappedAndLaterActivityStillCounts() throws Exception {
+        Building building = testData.edificio();
+        String email = "aux-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
+        MockMvc auxiliary = mockMvcAsScoped(email, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
+        long first = seedActivity(building, "B1", "otro@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-10T10:00:00Z", 1);
+        assertThat(unseenCount(auxiliary)).isEqualTo(1);
+
+        auxiliary.perform(post("/v1/building-activity/seen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastSeenId\":9000000000000}"))
+                .andExpect(status().isNoContent());
+
+        assertThat(lastSeenIdOf(email)).isEqualTo(first);
+        assertThat(unseenCount(auxiliary)).isZero();
+        seedActivity(building, "B2", "otro@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-11T10:00:00Z", 1);
+        assertThat(unseenCount(auxiliary)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("POST /seen con un lastSeenId gigante y sin actividad en alcance da 204 y no guarda marca de agua")
+    void hugeLastSeenIdWithoutActivityInScopeStoresNothing() throws Exception {
+        Building building = testData.edificio();
+        String email = "aux-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
+        MockMvc auxiliary = mockMvcAsScoped(email, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
+
+        auxiliary.perform(post("/v1/building-activity/seen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastSeenId\":9000000000000}"))
+                .andExpect(status().isNoContent());
+
+        assertThat(lastSeenIdOf(email)).isNull();
+        seedActivity(building, "B1", "otro@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-10T10:00:00Z", 1);
+        assertThat(unseenCount(auxiliary)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("from y to son dias de Buenos Aires: una actividad de 2026-03-10T02:00Z cae el 9 y no el 10")
+    void dateFiltersUseTheLocalDay() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliary = auxiliaryOf(building);
+        seedActivity(building, "TZ", "otro@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-03-10T02:00:00Z", 1);
+
+        assertThat(listBuildingNames(auxiliary, null, "from", "2026-03-10")).isEmpty();
+        assertThat(listBuildingNames(auxiliary, null, "from", "2026-03-09")).containsExactly("TZ");
+        assertThat(listBuildingNames(auxiliary, null, "to", "2026-03-09")).containsExactly("TZ");
+        assertThat(listBuildingNames(auxiliary, null, "to", "2026-03-08")).isEmpty();
+    }
+
+    private Long lastSeenIdOf(String email) {
+        List<Long> rows = jdbcTemplate.queryForList(
+                "select id_ultima_actividad from actividad_edificio_visto where usuario = ?", Long.class, email);
+        return rows.isEmpty() ? null : rows.getFirst();
+    }
+
+    @Test
     @DisplayName("un auxiliar de otro edificio no ve la actividad y recibe 403 si pide ese edificio")
     void auxiliaryOfAnotherBuildingSeesNothing() throws Exception {
         Scenario s = scenario();

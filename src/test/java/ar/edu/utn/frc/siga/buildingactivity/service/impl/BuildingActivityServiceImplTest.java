@@ -32,6 +32,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor.SpecificationFluentQuery;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
@@ -42,6 +43,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -83,11 +85,62 @@ class BuildingActivityServiceImplTest {
     }
 
     @Test
-    @DisplayName("markSeen: delega en el upsert con el usuario y el id recibido")
-    void markSeenDelegatesToAdvance() {
-        service.markSeen(ME, 901L);
+    @DisplayName("markSeen: un id por encima del maximo en alcance se acota a ese maximo")
+    void markSeenCapsLastSeenIdAtTheMaxIdInScope() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
 
-        verify(seenRepository).advance(ME, 901L);
+        service.markSeen(ME, 10_000L);
+
+        verify(seenRepository).advance(ME, 42L);
+    }
+
+    @Test
+    @DisplayName("markSeen: un id menor al maximo en alcance se usa tal cual")
+    void markSeenKeepsLastSeenIdWhenBelowTheMax() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 30L);
+
+        verify(seenRepository).advance(ME, 30L);
+    }
+
+    @Test
+    @DisplayName("markSeen: un id igual al maximo en alcance se usa tal cual")
+    void markSeenKeepsLastSeenIdWhenEqualToTheMax() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 42L);
+
+        verify(seenRepository).advance(ME, 42L);
+    }
+
+    @Test
+    @DisplayName("markSeen: sin actividad en alcance no avanza la marca de agua")
+    void markSeenWithoutActivityInScopeDoesNotAdvance() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(null);
+
+        service.markSeen(ME, 10_000L);
+
+        verify(seenRepository, never()).advance(any(), any());
+    }
+
+    @Test
+    @DisplayName("markSeen: busca el maximo ordenando por id desc dentro del alcance del usuario")
+    void markSeenLooksUpTheMaxIdByIdDescWithinScope() {
+        stubScope(BuildingScope.of(Set.of(1L, 2L)));
+        SpecificationFluentQuery<BuildingActivity> fluent = stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 10_000L);
+
+        verify(fluent).sortBy(Sort.by(Sort.Direction.DESC, "id"));
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).findBy(captor.capture(), any(Function.class));
+        Fixture fixture = evaluate(captor.getValue());
+        verify(fixture.path("buildingId")).in(Set.of(1L, 2L));
     }
 
     @Test
@@ -320,8 +373,8 @@ class BuildingActivityServiceImplTest {
     }
 
     @Test
-    @DisplayName("find: from incluye el dia completo desde 00:00 UTC y to excluye el 00:00 UTC del dia siguiente")
-    void findDateRangeUsesUtcDayBoundaries() {
+    @DisplayName("find: from incluye el dia completo desde 00:00 de Buenos Aires y to excluye el 00:00 del dia siguiente")
+    void findDateRangeUsesLocalDayBoundaries() {
         stubScope(BuildingScope.unrestricted());
         stubWatermark(0L);
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
@@ -330,8 +383,28 @@ class BuildingActivityServiceImplTest {
         service.find(ME, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), null, null, null, null, PageRequest.of(0, 20));
 
         Fixture fixture = evaluate(capturedFindSpec());
-        verify(fixture.cb()).greaterThanOrEqualTo(fixture.path("occurredAt"), Instant.parse("2026-10-01T00:00:00Z"));
-        verify(fixture.cb()).lessThan(fixture.path("occurredAt"), Instant.parse("2026-11-01T00:00:00Z"));
+        verify(fixture.cb()).greaterThanOrEqualTo(fixture.path("occurredAt"), Instant.parse("2026-10-01T03:00:00Z"));
+        verify(fixture.cb()).lessThan(fixture.path("occurredAt"), Instant.parse("2026-11-01T03:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("find: con from=2026-03-10 una actividad de 2026-03-10T02:00Z (23:00 del 9 local) queda excluida")
+    void findFromExcludesAnActivityOfThePreviousLocalDay() {
+        Instant lowerBound = capturedLowerBound(LocalDate.of(2026, 3, 10), null);
+
+        assertThat(lowerBound).isEqualTo(Instant.parse("2026-03-10T03:00:00Z"));
+        assertThat(Instant.parse("2026-03-10T02:00:00Z")).isBefore(lowerBound);
+        assertThat(Instant.parse("2026-03-10T03:00:00Z")).isAfterOrEqualTo(lowerBound);
+    }
+
+    @Test
+    @DisplayName("find: con to=2026-03-09 una actividad de 2026-03-10T02:00Z (23:00 del 9 local) queda incluida")
+    void findToIncludesAnActivityOfTheSameLocalDay() {
+        Instant upperBound = capturedUpperBound(LocalDate.of(2026, 3, 9));
+
+        assertThat(upperBound).isEqualTo(Instant.parse("2026-03-10T03:00:00Z"));
+        assertThat(Instant.parse("2026-03-10T02:00:00Z")).isBefore(upperBound);
+        assertThat(Instant.parse("2026-03-10T03:00:00Z")).isAfterOrEqualTo(upperBound);
     }
 
     @Test
@@ -399,6 +472,39 @@ class BuildingActivityServiceImplTest {
 
     private void stubScope(BuildingScope scope) {
         when(buildingScopeResolver.scopeFor(Permission.BUILDING_ACTIVITY_READ)).thenReturn(scope);
+    }
+
+    /** El repositorio ejecuta la funcion del test contra una consulta fluida que devuelve {@code latest} (o nada). */
+    private SpecificationFluentQuery<BuildingActivity> stubMaxIdInScope(BuildingActivity latest) {
+        SpecificationFluentQuery<BuildingActivity> fluent = mock(SpecificationFluentQuery.class);
+        when(fluent.sortBy(any(Sort.class))).thenReturn(fluent);
+        when(fluent.first()).thenReturn(Optional.ofNullable(latest));
+        when(repository.findBy(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Function.class)))
+                .thenAnswer(inv -> ((Function) inv.getArgument(1)).apply(fluent));
+        return fluent;
+    }
+
+    private Instant capturedLowerBound(LocalDate from, LocalDate to) {
+        Fixture fixture = findWithDates(from, to);
+        ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
+        verify(fixture.cb()).greaterThanOrEqualTo(eq(fixture.path("occurredAt")), captor.capture());
+        return captor.getValue();
+    }
+
+    private Instant capturedUpperBound(LocalDate to) {
+        Fixture fixture = findWithDates(null, to);
+        ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
+        verify(fixture.cb()).lessThan(eq(fixture.path("occurredAt")), captor.capture());
+        return captor.getValue();
+    }
+
+    private Fixture findWithDates(LocalDate from, LocalDate to) {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        service.find(ME, null, from, to, null, null, null, null, PageRequest.of(0, 20));
+        return evaluate(capturedFindSpec());
     }
 
     private void stubWatermark(long watermark) {
