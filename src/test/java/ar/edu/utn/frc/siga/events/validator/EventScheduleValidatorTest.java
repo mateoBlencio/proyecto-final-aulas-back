@@ -74,6 +74,42 @@ class EventScheduleValidatorTest {
                 .isInstanceOf(InvalidEventScheduleException.class);
     }
 
+    @Test
+    @DisplayName("validateBusinessHours: ventana 08:00-00:00 acepta 22:00-23:30 (fin 00:00 es fin de día)")
+    void validateBusinessHoursVentanaHastaMedianocheAceptaNoche() {
+        when(scheduleSettings.getEnd()).thenReturn(LocalTime.MIDNIGHT);
+
+        assertThatCode(() -> validator.validateBusinessHours(LocalTime.of(22, 0), LocalTime.of(23, 30)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateBusinessHours: ventana 08:00-00:00 sigue rechazando un inicio anterior a las 08:00")
+    void validateBusinessHoursVentanaHastaMedianocheRechazaInicioTemprano() {
+        when(scheduleSettings.getEnd()).thenReturn(LocalTime.MIDNIGHT);
+
+        assertThatThrownBy(() -> validator.validateBusinessHours(LocalTime.of(7, 59), LocalTime.of(9, 0)))
+                .isInstanceOf(InvalidEventScheduleException.class);
+    }
+
+    @Test
+    @DisplayName("validateBusinessHours: ventana 08:00-21:00 sigue rechazando 20:00-22:00")
+    void validateBusinessHoursVentanaAcotadaRechazaFinPosterior() {
+        when(scheduleSettings.getEnd()).thenReturn(LocalTime.of(21, 0));
+
+        assertThatThrownBy(() -> validator.validateBusinessHours(LocalTime.of(20, 0), LocalTime.of(22, 0)))
+                .isInstanceOf(InvalidEventScheduleException.class);
+    }
+
+    @Test
+    @DisplayName("validateBusinessHours: un evento con fin 00:00 se rechaza aunque la ventana termine a medianoche")
+    void validateBusinessHoursEventoConFinMedianocheSeRechaza() {
+        lenient().when(scheduleSettings.getEnd()).thenReturn(LocalTime.MIDNIGHT);
+
+        assertThatThrownBy(() -> validator.validateBusinessHours(LocalTime.of(22, 0), LocalTime.MIDNIGHT))
+                .isInstanceOf(InvalidEventScheduleException.class);
+    }
+
 
     @Test
     @DisplayName("validateAcademicReference: OTRO sin subjectId ni commissionId → no lanza")

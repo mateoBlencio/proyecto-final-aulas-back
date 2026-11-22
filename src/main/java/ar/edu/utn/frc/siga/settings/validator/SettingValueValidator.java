@@ -30,6 +30,14 @@ public class SettingValueValidator {
         };
     }
 
+    /** Fin 00:00 equivale a fin de día; cualquier otro fin debe ser posterior al inicio. Sin cruce de medianoche. */
+    public void validateEventHours(LocalTime start, LocalTime end) {
+        if (!LocalTime.MIDNIGHT.equals(end) && !start.isBefore(end)) {
+            throw new InvalidSettingValueException("La hora de inicio de la ventana horaria (" + start
+                    + ") debe ser anterior a la hora de fin (" + end + ")");
+        }
+    }
+
     private int validateInt(SettingKey key, String value) {
         int parsed = parse(key, value, "un entero", () -> Integer.parseInt(value));
         checkBounds(key, parsed, boundOf(catalog.min(key)), boundOf(catalog.max(key)));

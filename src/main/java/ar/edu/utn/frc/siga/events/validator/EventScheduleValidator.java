@@ -30,7 +30,9 @@ public class EventScheduleValidator {
             throw new InvalidEventScheduleException(
                     "La hora de fin (" + end + ") debe ser posterior a la hora de inicio (" + start + ").");
         }
-        if (start.isBefore(scheduleSettings.getStart()) || end.isAfter(scheduleSettings.getEnd())) {
+        LocalTime windowEnd = scheduleSettings.getEnd();
+        boolean endOfDay = LocalTime.MIDNIGHT.equals(windowEnd);
+        if (start.isBefore(scheduleSettings.getStart()) || (!endOfDay && end.isAfter(windowEnd))) {
             throw new InvalidEventScheduleException("El horario " + start + "-" + end
                     + " está fuera de la ventana permitida (" + scheduleSettings.getStart()
                     + "-" + scheduleSettings.getEnd() + ").");

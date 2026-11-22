@@ -8,17 +8,25 @@ import ar.edu.utn.frc.siga.settings.config.SettingsCatalogProperties;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
+import ar.edu.utn.frc.siga.space.model.Building;
+import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(IntegrationTestData.class)
 @DisplayName("Settings API (integración)")
 class SettingsApiIntegrationTest extends AbstractIntegrationTest {
 
@@ -44,6 +53,8 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     private SettingsCatalogProperties catalog;
     @Autowired
     private ar.edu.utn.frc.siga.settings.service.SettingsStore settingsStore;
+    @Autowired
+    private IntegrationTestData testData;
 
     @BeforeEach
     void ensureSeeded() {
@@ -234,6 +245,94 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
             new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
                     settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));
         }
+    }
+
+    @Test
+    @DisplayName("PUT events.hours.end anterior al inicio vigente responde 400 y el valor en base no cambia")
+    void put_endBeforeCurrentStart_returns400AndKeepsValue() throws Exception {
+        assertThat(storedValue("events.hours.start")).isEqualTo("08:00");
+        String endBefore = storedValue("events.hours.end");
+
+        putValue("events.hours.end", "07:00")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("debe ser anterior")));
+
+        assertThat(storedValue("events.hours.end")).isEqualTo(endBefore);
+        assertThat(settingsStore.getTime(SettingKey.EVENTS_HOURS_END)).isEqualTo(LocalTime.parse(endBefore));
+    }
+
+    @Test
+    @DisplayName("PUT events.hours.end igual al inicio vigente (08:00) responde 400")
+    void put_endEqualToCurrentStart_returns400() throws Exception {
+        assertThat(storedValue("events.hours.start")).isEqualTo("08:00");
+        String endBefore = storedValue("events.hours.end");
+
+        putValue("events.hours.end", "08:00").andExpect(status().isBadRequest());
+
+        assertThat(storedValue("events.hours.end")).isEqualTo(endBefore);
+    }
+
+    @Test
+    @DisplayName("PUT en lote con un par de ventana inválido no persiste ninguna clave")
+    void putBatch_invalidWindowPair_writesNothing() throws Exception {
+        String ttlBefore = storedValue("preview.ttlMinutes");
+        String startBefore = storedValue("events.hours.start");
+        String endBefore = storedValue("events.hours.end");
+        String body = """
+                {"settings":[
+                  {"key":"preview.ttlMinutes","value":"120"},
+                  {"key":"events.hours.start","value":"22:00"},
+                  {"key":"events.hours.end","value":"21:00"}
+                ]}
+                """;
+
+        mockMvc.perform(put("/v1/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        assertThat(storedValue("preview.ttlMinutes")).isEqualTo(ttlBefore);
+        assertThat(storedValue("events.hours.start")).isEqualTo(startBefore);
+        assertThat(storedValue("events.hours.end")).isEqualTo(endBefore);
+    }
+
+    @Test
+    @DisplayName("Con events.hours.end en 00:00 el tablero semanal responde 200 y mide la banda 08:00-24:00")
+    void put_endMidnight_dashboardWeekStillWorks() throws Exception {
+        assertThat(storedValue("events.hours.start")).isEqualTo("08:00");
+        String endBefore = storedValue("events.hours.end");
+        Building building = testData.edificio();
+        testData.aula(building, testData.tipoAulaPorDefecto(), 30);
+        LocalDate monday = LocalDate.now().plusYears(5).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
+                .plusWeeks(95);
+        try {
+            putValue("events.hours.end", "00:00")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.value").value("00:00"));
+
+            String content = mockMvc.perform(get("/v1/dashboard/week").param("weekOf", monday.toString()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            JsonNode root = objectMapper.readTree(content);
+            assertThat(LocalTime.parse(root.get("parameters").get("hoursEnd").asText())).isEqualTo(LocalTime.MIDNIGHT);
+            JsonNode mine = null;
+            for (JsonNode node : root.get("buildings")) {
+                if (node.get("buildingId").asLong() == building.getId()) {
+                    mine = node;
+                }
+            }
+            assertThat(mine).isNotNull();
+            int availableDays = 6 - root.get("excludedDays").size();
+            assertThat(mine.get("hourlyProfile")).hasSize(16);
+            assertThat(mine.get("occupancy").get("availableHours").asDouble()).isEqualTo(16.0 * availableDays);
+        } finally {
+            putValue("events.hours.end", endBefore).andExpect(status().isOk());
+        }
+    }
+
+    private String storedValue(String key) {
+        return settingRepository.findById(key).orElseThrow().getValue();
     }
 
     private org.springframework.test.web.servlet.ResultActions putValue(String key, String value) throws Exception {
