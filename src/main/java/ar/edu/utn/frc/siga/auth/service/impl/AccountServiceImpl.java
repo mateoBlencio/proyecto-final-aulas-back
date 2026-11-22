@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.auth.exception.FieldValidationException;
 import ar.edu.utn.frc.siga.auth.exception.TooManyRequestsException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.model.User;
+import ar.edu.utn.frc.siga.auth.repository.PasswordResetTokenRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.LoginRateLimiter;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
@@ -46,6 +47,7 @@ public class AccountServiceImpl implements AccountService {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final UserRepository userRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final RoleAssignmentComposer roleAssignmentComposer;
     private final LoginRateLimiter loginRateLimiter;
     private final PasswordEncoder passwordEncoder;
@@ -55,12 +57,14 @@ public class AccountServiceImpl implements AccountService {
     private final NotificationSender notificationSender;
     private final TransactionTemplate transactionTemplate;
 
-    public AccountServiceImpl(UserRepository userRepository, RoleAssignmentComposer roleAssignmentComposer,
+    public AccountServiceImpl(UserRepository userRepository, PasswordResetTokenRepository passwordResetTokenRepository,
+                              RoleAssignmentComposer roleAssignmentComposer,
                               LoginRateLimiter loginRateLimiter, PasswordEncoder passwordEncoder,
                               PasswordPolicy passwordPolicy, RefreshTokenService refreshTokenService,
                               AuthService authService, NotificationSender notificationSender,
                               PlatformTransactionManager transactionManager) {
         this.userRepository = userRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.roleAssignmentComposer = roleAssignmentComposer;
         this.loginRateLimiter = loginRateLimiter;
         this.passwordEncoder = passwordEncoder;
@@ -122,6 +126,7 @@ public class AccountServiceImpl implements AccountService {
             managed.setPasswordHash(encoded);
             userRepository.save(managed);
             refreshTokenService.revokeAllByUserId(managed.getId());
+            passwordResetTokenRepository.deleteByUserId(managed.getId());
             notificationSender.send(new NotificationRequest(
                     NotificationTemplate.PASSWORD_CHANGED,
                     List.of(new NotificationRecipient(fullName(managed), managed.getEmail())),

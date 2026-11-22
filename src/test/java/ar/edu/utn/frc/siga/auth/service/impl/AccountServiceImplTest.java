@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.auth.exception.FieldValidationException;
 import ar.edu.utn.frc.siga.auth.exception.TooManyRequestsException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.model.User;
+import ar.edu.utn.frc.siga.auth.repository.PasswordResetTokenRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.LoginRateLimiter;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
@@ -62,6 +63,8 @@ class AccountServiceImplTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+    @Mock
     private RoleAssignmentComposer roleAssignmentComposer;
     @Mock
     private LoginRateLimiter loginRateLimiter;
@@ -83,7 +86,7 @@ class AccountServiceImplTest {
     @BeforeEach
     void setUp() {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
-        service = new AccountServiceImpl(userRepository, roleAssignmentComposer, loginRateLimiter, passwordEncoder,
+        service = new AccountServiceImpl(userRepository, passwordResetTokenRepository, roleAssignmentComposer, loginRateLimiter, passwordEncoder,
                 new PasswordPolicy(), refreshTokenService, authService, notificationSender, transactionManager);
     }
 
@@ -173,6 +176,7 @@ class AccountServiceImplTest {
         assertThat(sent.getValue().template()).isEqualTo(NotificationTemplate.PASSWORD_CHANGED);
         assertThat(sent.getValue().recipients()).singleElement()
                 .satisfies(recipient -> assertThat(recipient.email()).isEqualTo(EMAIL));
+        verify(passwordResetTokenRepository).deleteByUserId(7L);
         InOrder order = inOrder(refreshTokenService, authService);
         order.verify(refreshTokenService).revokeAllByUserId(7L);
         order.verify(authService).startSession(user);
@@ -237,6 +241,7 @@ class AccountServiceImplTest {
     }
 
     private void verifyNothingWritten() {
+        verify(passwordResetTokenRepository, never()).deleteByUserId(anyLong());
         verify(userRepository, never()).save(any());
         verify(refreshTokenService, never()).revokeAllByUserId(anyLong());
         verifyNoInteractions(notificationSender, authService);
