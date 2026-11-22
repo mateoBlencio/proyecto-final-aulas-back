@@ -289,6 +289,24 @@ class PasswordResetServiceImplTest {
     }
 
     @Test
+    @DisplayName("reset toma el lock del usuario antes que el del token")
+    void resetLocksTheUserBeforeTheToken() {
+        User user = user(7L, true);
+        PasswordResetToken token = token(user, Instant.now().plusSeconds(600));
+        token.setId(55L);
+        String hash = OpaqueTokens.hash(RAW_TOKEN);
+        when(tokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(token));
+        when(tokenRepository.findByTokenHashForUpdate(hash)).thenReturn(Optional.of(token));
+        when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn("hash-nuevo");
+
+        service.reset(RAW_TOKEN, NEW_PASSWORD, IP);
+
+        InOrder order = inOrder(userRepository, tokenRepository);
+        order.verify(userRepository).findByIdForUpdate(7L);
+        order.verify(tokenRepository).findByTokenHashForUpdate(hash);
+    }
+
+    @Test
     @DisplayName("si otro pedido consumió el token entre la lectura y el lock, lanza y no revoca ni avisa")
     void resetLosingTheRaceThrowsAndRollsBack() {
         User user = user(7L, true);

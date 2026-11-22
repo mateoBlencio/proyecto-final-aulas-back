@@ -120,6 +120,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
         transactionTemplate.executeWithoutResult(status -> {
             Instant now = Instant.now();
+            userRepository.findByIdForUpdate(user.getId());
             PasswordResetToken locked = tokenRepository.findByTokenHashForUpdate(tokenHash)
                     .filter(candidate -> isUsable(candidate, now))
                     .orElseThrow(InvalidResetTokenException::new);
