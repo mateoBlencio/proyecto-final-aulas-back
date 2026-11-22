@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -81,6 +82,13 @@ public class GlobalExceptionHandler {
         String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido";
         return ProblemDetails.of(HttpStatus.BAD_REQUEST, "Parámetro con tipo inválido",
                 "El parámetro '" + ex.getName() + "' debe ser de tipo " + expectedType + ".");
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ProblemDetail handleInvalidSortProperty(PropertyReferenceException ex) {
+        log.warn("Propiedad de orden inválida: {}", ex.getMessage());
+        return ProblemDetails.of(HttpStatus.BAD_REQUEST, "Propiedad de orden inválida",
+                "No se puede ordenar por '" + ex.getPropertyName() + "'.");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

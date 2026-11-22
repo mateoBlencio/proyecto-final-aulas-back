@@ -50,7 +50,6 @@ class AuditOperationCoverageTest {
 
     /** Key {@code Class#method}; the value is the reason it carries no annotation. */
     private static final Map<String, String> EXCEPTIONS = Map.ofEntries(
-            Map.entry("AuthServiceImpl#login", "writes no audited entities (refresh tokens are not @Audited)"),
             Map.entry("AuthServiceImpl#refresh", "writes no audited entities (refresh tokens are not @Audited)"),
             Map.entry("AuthServiceImpl#logout", "writes no audited entities (refresh tokens are not @Audited)"),
             Map.entry("RoomRequestExpiryScheduler#expireOverdueItems",

@@ -15,7 +15,7 @@ public interface UserService {
 
     UserResponseDto create(CreateUserRequestDto dto, String currentUserEmail);
 
-    UserResponseDto setEnabled(Long id, boolean enabled);
+    UserResponseDto setEnabled(Long id, boolean enabled, String currentUserEmail);
 
     Page<UserResponseDto> findEnabled(Pageable pageable);
 

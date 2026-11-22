@@ -1,14 +1,19 @@
 package ar.edu.utn.frc.siga.common.util;
 
+import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("Paging")
@@ -51,6 +56,36 @@ class PagingTest {
     void unpagedNoTienePageSize() {
         assertThatThrownBy(() -> Paging.of(List.of(1, 2, 3), Pageable.unpaged()))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    @DisplayName("requireSortable: propiedades permitidas pasan")
+    void requireSortablePermitidaPasa() {
+        assertThatCode(() -> Paging.requireSortable(Sort.by("id", "email"), Set.of("id", "email", "lastName")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("requireSortable: una propiedad no permitida lanza InvalidSortPropertyException con 400 y la propiedad")
+    void requireSortableNoPermitidaLanza() {
+        assertThatThrownBy(() -> Paging.requireSortable(Sort.by("id", "passwordHash"), Set.of("id", "email")))
+                .isInstanceOfSatisfying(InvalidSortPropertyException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.getMessage()).contains("passwordHash");
+                });
+    }
+
+    @Test
+    @DisplayName("requireSortable: Sort.unsorted() pasa aunque la lista permitida esté vacía")
+    void requireSortableUnsortedPasa() {
+        assertThatCode(() -> Paging.requireSortable(Sort.unsorted(), Set.of())).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("requireSortable: la dirección no cuenta, solo la propiedad")
+    void requireSortableIgnoraLaDireccion() {
+        assertThatCode(() -> Paging.requireSortable(Sort.by(Sort.Direction.DESC, "email"), Set.of("email")))
+                .doesNotThrowAnyException();
     }
 
     @Test

@@ -10,11 +10,11 @@ import ar.edu.utn.frc.siga.buildingactivity.model.RoomRequestItemRef;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivitySeenRepository;
 import ar.edu.utn.frc.siga.buildingactivity.service.BuildingActivityService;
-import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.search.LikePatterns;
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.util.Paging;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
@@ -112,11 +112,7 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
 
     private static Specification<BuildingActivity> orderedBy(Sort sort) {
         List<Sort.Order> requested = sort.isSorted() ? sort.toList() : List.of(Sort.Order.desc("occurredAt"));
-        requested.forEach(order -> {
-            if (!SORTABLE.contains(order.getProperty())) {
-                throw new InvalidSortPropertyException(order.getProperty(), SORTABLE);
-            }
-        });
+        Paging.requireSortable(Sort.by(requested), SORTABLE);
         return (root, query, cb) -> {
             if (!Long.class.equals(query.getResultType())) {
                 List<Order> orders = new ArrayList<>();

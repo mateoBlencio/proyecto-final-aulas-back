@@ -15,3 +15,9 @@ body:json {
     "enabled": false
   }
 }
+
+docs {
+  PATCH /v1/users/{id}/enabled. Permiso: PERM_USER_MANAGE.
+  Al inhabilitar responde 400 si el usuario es el que hace la petición o si es
+  la única SUBSECRETARIA habilitada.
+}

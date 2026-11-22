@@ -14,8 +14,11 @@ import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
 
@@ -207,6 +210,23 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(userRepository.findById(id).orElseThrow().getEnabled()).isFalse();
     }
 
+    @Test
+    @DisplayName("PATCH /v1/users/{id}/enabled con el propio usuario autenticado responde 400 y no lo inhabilita")
+    void setEnabled_disablingSelf_returns400() throws Exception {
+        String email = "self.disable." + System.nanoTime() + "@frc.utn.edu.ar";
+        MockMvc self = mockMvcAs(email, SystemRole.SUBSECRETARIA);
+        long id = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();
+
+        self.perform(patch("/v1/users/{id}/enabled", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("User domain error"))
+                .andExpect(jsonPath("$.detail").value("Users cannot disable themselves"));
+
+        assertThat(userRepository.findById(id).orElseThrow().getEnabled()).isTrue();
+    }
+
     // ---- listados ----
 
     @Test
@@ -224,11 +244,113 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     // ---- autorización por rol ----
 
     @Test
-    @DisplayName("GET /v1/users es accesible para AUXILIAR_AULICO (200)")
-    void findEnabled_asAuxiliar_returns200() throws Exception {
+    @DisplayName("GET /v1/users está prohibido para AUXILIAR_AULICO (403): ya no tiene USER_READ")
+    void findEnabled_asAuxiliar_returns403() throws Exception {
         mockMvcAsAuxiliar("aux." + System.nanoTime() + "@frc.utn.edu.ar")
                 .perform(get("/v1/users"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /v1/users/with-role está prohibido para AUXILIAR_AULICO (403)")
+    void findByRole_asAuxiliar_returns403() throws Exception {
+        mockMvcAsAuxiliar("aux." + System.nanoTime() + "@frc.utn.edu.ar")
+                .perform(get("/v1/users/with-role")
+                        .param("role", "AUXILIAR_AULICO")
+                        .param("buildingId", "1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /v1/users/with-role es accesible para SUBSECRETARIA (200)")
+    void findByRole_asSubsecretaria_returns200() throws Exception {
+        mockMvc.perform(get("/v1/users/with-role")
+                        .param("role", "AUXILIAR_AULICO")
+                        .param("buildingId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    @DisplayName("GET /v1/users es accesible para SUBSECRETARIA (200)")
+    void findEnabled_asSubsecretaria_returns200() throws Exception {
+        mockMvc.perform(get("/v1/users")).andExpect(status().isOk());
+    }
+
+    // ---- orden de los listados ----
+
+    @Test
+    @DisplayName("GET /v1/users?sort=passwordHash responde 400 y no filtra la propiedad por el orden")
+    void findEnabled_sortByPasswordHash_returns400() throws Exception {
+        mockMvc.perform(get("/v1/users").param("sort", "passwordHash"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("passwordHash")));
+    }
+
+    @Test
+    @DisplayName("GET /v1/users/disabled?sort=passwordHash responde 400")
+    void findDisabled_sortByPasswordHash_returns400() throws Exception {
+        mockMvc.perform(get("/v1/users/disabled").param("sort", "passwordHash"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /v1/users?sort=email responde 200 y /disabled?sort=lastName,desc también")
+    void listings_sortByListedProperty_returns200() throws Exception {
+        mockMvc.perform(get("/v1/users").param("sort", "email")).andExpect(status().isOk());
+        mockMvc.perform(get("/v1/users/disabled").param("sort", "lastName,desc")).andExpect(status().isOk());
+    }
+
+    // ---- límites del alta (SEC-03) ----
+
+    @ParameterizedTest(name = "password de {0} caracteres -> {1}")
+    @CsvSource({"7, 400", "8, 201", "72, 201", "73, 400"})
+    @DisplayName("POST /v1/users valida el largo de la contraseña entre 8 y 72 caracteres")
+    void create_passwordLength(int length, int expectedStatus) throws Exception {
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(uniqueEmail(), "p".repeat(length))))
+                .andExpect(status().is(expectedStatus));
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con contraseña de 36 caracteres de 2 bytes (72 bytes) responde 201 y con 40 (80 bytes) 400")
+    void create_passwordByteLimit() throws Exception {
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(uniqueEmail(), "é".repeat(36))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(uniqueEmail(), "é".repeat(40))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("User domain error"));
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con firstName de 101 caracteres responde 400 con error en firstName")
+    void create_firstNameTooLong_returns400() throws Exception {
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"supersegura","firstName":"%s","lastName":"Apellido"}
+                                """.formatted(uniqueEmail(), "n".repeat(101))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.firstName").exists());
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con email de 151 caracteres responde 400 con error en email")
+    void create_emailTooLong_returns400() throws Exception {
+        String email = "a".repeat(64) + "@" + "b".repeat(40) + "." + "c".repeat(41) + ".com";
+        assertThat(email).hasSize(151);
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(email, "supersegura")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
     }
 
     @Test
