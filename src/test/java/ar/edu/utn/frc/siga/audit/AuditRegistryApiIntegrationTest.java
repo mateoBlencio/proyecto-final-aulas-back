@@ -248,6 +248,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void bumpSetting(String value) throws Exception {
+        originalSettings.putIfAbsent(SettingKey.EVENTS_HOURS_END, settingsStore.getRaw(SettingKey.EVENTS_HOURS_END));
         mockMvc.perform(put("/v1/settings/{key}", "events.hours.end")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"" + value + "\"}"))

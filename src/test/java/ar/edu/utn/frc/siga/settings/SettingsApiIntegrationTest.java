@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,12 +59,33 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private IntegrationTestData testData;
 
+    private final Map<SettingKey, String> initialValues = new LinkedHashMap<>();
+
     @BeforeEach
     void ensureSeeded() {
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             for (SettingKey key : SettingKey.values()) {
                 if (!settingRepository.existsById(key.getKey())) {
                     settingRepository.save(new Setting(key.getKey(), catalog.defaultValue(key)));
+                }
+            }
+        });
+        initialValues.clear();
+        for (SettingKey key : SettingKey.values()) {
+            initialValues.put(key, settingsStore.getRaw(key));
+        }
+    }
+
+    /**
+     * La base y el caché de settings se comparten con el resto de las clases de integración: sin esta
+     * restauración, un PUT de acá (por ejemplo events.hours.end=22:30) rompe a los tests que corren después.
+     */
+    @AfterEach
+    void restoreChangedSettings() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            for (Map.Entry<SettingKey, String> initial : initialValues.entrySet()) {
+                if (!initial.getValue().equals(settingsStore.getRaw(initial.getKey()))) {
+                    settingsStore.write(initial.getKey(), initial.getValue());
                 }
             }
         });

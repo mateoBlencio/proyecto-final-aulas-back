@@ -526,14 +526,19 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
                 .dayOfWeek(today.getDayOfWeek()).startDate(today.minusWeeks(1)).endDate(today.plusWeeks(2))
                 .subjectId(sc.subjectId()).commissionId(sc.commissionId()).build());
         occurrenceRepository.saveAll(event.toOccurrences());
+        // La ventana contiene a hoy: otras clases dejan eventos sin aula ahí y el tablero pagina de a 20 por id.
+        // La especialidad es propia de este evento y lo deja siempre en la primera página.
+        String specialty = academicEventService.findById(event.getId()).subject().studyPlan().specialty().name();
         Window w = new Window(today.minusWeeks(1), today.plusWeeks(2));
-        JsonNode before = eventNode(board(w, "issues", "UNALLOCATED", "onlyFuture", "false"), event.getId());
+        JsonNode before = eventNode(
+                board(w, "issues", "UNALLOCATED", "onlyFuture", "false", "specialty", specialty), event.getId());
         assertThat(datesOf(before)).containsExactly(today.minusWeeks(1).toString(), today.toString(),
                 today.plusWeeks(1).toString(), today.plusWeeks(2).toString());
 
         suspendSubject(sc.subjectId());
 
-        JsonNode after = eventNode(board(w, "issues", "UNALLOCATED", "onlyFuture", "false"), event.getId());
+        JsonNode after = eventNode(
+                board(w, "issues", "UNALLOCATED", "onlyFuture", "false", "specialty", specialty), event.getId());
         assertThat(datesOf(after)).containsExactly(today.minusWeeks(1).toString());
     }
 
