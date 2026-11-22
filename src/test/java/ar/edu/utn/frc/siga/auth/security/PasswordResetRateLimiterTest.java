@@ -117,4 +117,33 @@ class PasswordResetRateLimiterTest {
         assertThatThrownBy(() -> limiter.checkReset("203.0.113.1")).isInstanceOf(TooManyRequestsException.class);
         assertThatCode(() -> limiter.checkReset("203.0.113.2")).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("forgot: los 429 por tope de IP no descuentan el cupo del correo para otra IP")
+    void rejectionsByIpCapDoNotConsumeTheEmailQuota() {
+        for (int i = 0; i < 20; i++) {
+            limiter.checkForgot("persona" + i + "@frc.utn.edu.ar", "198.51.100.1");
+        }
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> limiter.checkForgot(EMAIL, "198.51.100.1"))
+                    .isInstanceOf(TooManyRequestsException.class);
+        }
+
+        assertThatCode(() -> limiter.checkForgot(EMAIL, "203.0.113.50")).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("forgot: un 429 por tope de correo e IP no descuenta el cupo del correo")
+    void rejectionByEmailAndIpCapDoesNotConsumeTheEmailQuota() {
+        for (int i = 0; i < 3; i++) {
+            limiter.checkForgot(EMAIL, "203.0.113.1");
+        }
+        assertThatThrownBy(() -> limiter.checkForgot(EMAIL, "203.0.113.1"))
+                .isInstanceOf(TooManyRequestsException.class);
+
+        assertThatCode(() -> limiter.checkForgot(EMAIL, "203.0.113.2")).doesNotThrowAnyException();
+        assertThatCode(() -> limiter.checkForgot(EMAIL, "203.0.113.3")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> limiter.checkForgot(EMAIL, "203.0.113.4"))
+                .isInstanceOf(TooManyRequestsException.class);
+    }
 }
