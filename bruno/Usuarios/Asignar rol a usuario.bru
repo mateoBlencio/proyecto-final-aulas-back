@@ -34,4 +34,6 @@ docs {
   Regla de alcance por rol: ADMINISTRADOR solo admite GLOBAL; AUXILIAR_AULICO
   solo BUILDING (una asignación por edificio); CONSULTA admite GLOBAL o
   BUILDING. Un rol con alcance no permitido responde 400.
+  Exclusividad: ADMINISTRADOR no puede convivir con AUXILIAR_AULICO ni CONSULTA. Asignar uno
+  sobre el otro responde 422 (revocar primero las asignaciones previas).
 }

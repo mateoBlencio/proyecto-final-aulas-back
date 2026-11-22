@@ -1,0 +1,27 @@
+meta {
+  name: Restablecer contraseña
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/auth/reset-password
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "token": "token-del-enlace",
+    "newPassword": "una contraseña larga y segura"
+  }
+}
+
+docs {
+  POST /auth/reset-password. Público.
+  Responde 204 sin cuerpo y no inicia sesión. Revoca todos los refresh tokens del usuario.
+  400 sin errors: el token no existe, ya se usó, venció o el usuario está inhabilitado.
+  400 con errors.newPassword: la contraseña incumple la política (12 caracteres a 72 bytes,
+  sin comunes, sin datos del usuario, sin un solo carácter repetido); el token sigue sirviendo.
+  429 con Retry-After tras 10 intentos por ip en una hora.
+}
