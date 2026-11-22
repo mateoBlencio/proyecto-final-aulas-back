@@ -28,12 +28,14 @@ public class PasswordResetRateLimiter {
     }
 
     public void checkForgot(String email, String ip) {
-        consume("e:" + email + "|" + ip, properties.getMaxRequestsPerEmailPerIp(), forgotBuckets);
-        consume("i:" + ip, properties.getMaxRequestsPerIp(), forgotBuckets);
+        String clientIp = ClientIps.normalize(ip);
+        consume("m:" + email, properties.getMaxRequestsPerEmail(), forgotBuckets);
+        consume("e:" + email + "|" + clientIp, properties.getMaxRequestsPerEmailPerIp(), forgotBuckets);
+        consume("i:" + clientIp, properties.getMaxRequestsPerIp(), forgotBuckets);
     }
 
     public void checkReset(String ip) {
-        consume("i:" + ip, properties.getMaxResetAttemptsPerIp(), resetBuckets);
+        consume("i:" + ClientIps.normalize(ip), properties.getMaxResetAttemptsPerIp(), resetBuckets);
     }
 
     private void consume(String key, int capacity, Cache<String, Bucket> cache) {

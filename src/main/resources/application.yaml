@@ -249,6 +249,7 @@ siga:
   password-reset:
     frontend-base-url: ${FRONTEND_BASE_URL}
     token-ttl-minutes: 30
+    max-requests-per-email: 5
     max-requests-per-email-per-ip: 3
     max-requests-per-ip: 20
     max-reset-attempts-per-ip: 10

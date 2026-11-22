@@ -18,6 +18,9 @@ public class PasswordResetProperties {
     private int tokenTtlMinutes = 30;
 
     @Positive
+    private int maxRequestsPerEmail = 5;
+
+    @Positive
     private int maxRequestsPerEmailPerIp = 3;
 
     @Positive
