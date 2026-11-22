@@ -6,11 +6,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,8 @@ public class PasswordPolicy {
     private static final int MAX_BYTES = 72;
     private static final int MIN_PERSONAL_TOKEN_LENGTH = 4;
     private static final String COMMON_PASSWORDS = "security/common-passwords.txt";
+    private static final String NAME_SEPARATORS = "[\\s-]+";
+    private static final Pattern DIACRITICS = Pattern.compile("\\p{M}+");
 
     private final Set<String> commonPasswords = loadCommonPasswords();
 
@@ -34,10 +38,11 @@ public class PasswordPolicy {
             errors.add("La contraseña no puede superar los 72 bytes. Las tildes y los símbolos ocupan más de uno.");
         }
         String lower = password.toLowerCase(Locale.ROOT);
+        String folded = fold(password);
         if (commonPasswords.contains(lower)) {
             errors.add("La contraseña es demasiado común.");
         }
-        if (containsPersonalData(lower, email, firstName, lastName)) {
+        if (containsPersonalData(folded, email, firstName, lastName)) {
             errors.add("La contraseña no puede contener el nombre, el apellido ni el correo del usuario.");
         }
         if (password.codePoints().distinct().count() == 1) {
@@ -56,12 +61,16 @@ public class PasswordPolicy {
     private static Stream<String> personalTokens(String email, String firstName, String lastName) {
         String localPart = email == null ? "" : email.substring(0, email.indexOf('@') < 0 ? email.length() : email.indexOf('@'));
         return Stream.concat(Stream.of(localPart), Stream.concat(words(firstName), words(lastName)))
-                .map(token -> token.toLowerCase(Locale.ROOT))
+                .map(PasswordPolicy::fold)
                 .filter(token -> token.codePointCount(0, token.length()) >= MIN_PERSONAL_TOKEN_LENGTH);
     }
 
+    private static String fold(String value) {
+        return DIACRITICS.matcher(Normalizer.normalize(value, Normalizer.Form.NFD)).replaceAll("").toLowerCase(Locale.ROOT);
+    }
+
     private static Stream<String> words(String name) {
-        return name == null ? Stream.empty() : Stream.of(name.strip().split("\s+"));
+        return name == null ? Stream.empty() : Stream.of(name.strip().split(NAME_SEPARATORS));
     }
 
     private static Set<String> loadCommonPasswords() {
