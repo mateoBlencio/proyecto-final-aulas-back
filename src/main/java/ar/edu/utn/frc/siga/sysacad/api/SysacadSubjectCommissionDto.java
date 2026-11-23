@@ -5,5 +5,11 @@ public record SysacadSubjectCommissionDto(
         Integer specialtyCode,
         Integer studyPlanCode,
         Integer subjectCode,
-        Integer enrolledCount
-) {}
+        Integer enrolledCount,
+        Integer semester
+) {
+    public SysacadSubjectCommissionDto withSemester(Integer semester) {
+        return new SysacadSubjectCommissionDto(courseCode, specialtyCode, studyPlanCode, subjectCode,
+                enrolledCount, semester);
+    }
+}

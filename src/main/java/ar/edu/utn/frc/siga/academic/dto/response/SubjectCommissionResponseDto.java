@@ -11,11 +11,12 @@ public record SubjectCommissionResponseDto(
         CommissionResponseDto commission,
         Integer enrolledCount,
         boolean inPerson,
+        String term,
         boolean enabled,
         UnavailableReason unavailableReason
 ) {
     public SubjectCommissionResponseDto(Long subjectId, SubjectSummaryDto subject, Long commissionId,
             CommissionResponseDto commission, Integer enrolledCount, boolean inPerson, boolean enabled) {
-        this(subjectId, subject, commissionId, commission, enrolledCount, inPerson, enabled, null);
+        this(subjectId, subject, commissionId, commission, enrolledCount, inPerson, null, enabled, null);
     }
 }

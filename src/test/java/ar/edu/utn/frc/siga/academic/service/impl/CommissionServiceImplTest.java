@@ -299,7 +299,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: resuelve el AcademicPeriod anual a partir del año de la comisión y da de alta la comisión")
     void syncCommissionsCreatesCommissionUnderAnnualPeriod() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
 
@@ -331,8 +331,8 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(period));
 
         int affected = service.syncCommissions(List.of(
-                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null),
-                new CommissionSyncCommand("101", 1, 2024, 56, 2026, null)), 0);
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null),
+                new CommissionSyncCommand("101", 1, 2024, 56, 2026, null, null)), 0);
 
         assertThat(affected).isZero();
         verify(commissionRepository, never()).save(any(Commission.class));
@@ -346,7 +346,7 @@ class CommissionServiceImplTest {
         when(commissionRepository.findAll()).thenReturn(List.of(current));
 
         assertThatThrownBy(() -> service.syncCommissions(
-                List.of(new CommissionSyncCommand(null, 1, 2024, 55, 2026, null)), 0))
+                List.of(new CommissionSyncCommand(null, 1, 2024, 55, 2026, null, null)), 0))
                 .isInstanceOf(SyncAbortedException.class);
 
         assertThat(current.getSysacadEnabled()).isTrue();
@@ -368,7 +368,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(period));
 
         assertThatThrownBy(() -> service.syncCommissions(
-                List.of(new CommissionSyncCommand("101", null, null, null, 2026, null)), 50))
+                List.of(new CommissionSyncCommand("101", null, null, null, 2026, null, null)), 50))
                 .isInstanceOf(SyncAbortedException.class);
 
         assertThat(second.getSysacadEnabled()).isTrue();
@@ -378,7 +378,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: delega en StudyPlanResolver la especialidad+plan del comando")
     void syncCommissionsDelegatesStudyPlanResolution() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null);
         AcademicPeriod annualPeriod = annualPeriod();
 
         when(commissionRepository.findAll()).thenReturn(List.of());
@@ -395,7 +395,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: si StudyPlanResolver no resuelve la especialidad, igual sincroniza la comisión")
     void syncCommissionsSkipsStudyPlanWhenUnresolved() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null);
         AcademicPeriod annualPeriod = annualPeriod();
 
         when(commissionRepository.findAll()).thenReturn(List.of());
@@ -412,7 +412,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: crea materia_comision cuando la materia y los inscriptos están disponibles")
     void syncCommissionsCreatesSubjectCommissionLink() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -437,7 +437,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: actualiza cantidad_inscriptos cuando cambió respecto al valor existente")
     void syncCommissionsUpdatesEnrolledCountWhenChanged() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -462,7 +462,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: si la materia del comando no está sincronizada, no crea el link pero igual sincroniza la comisión")
     void syncCommissionsSkipsLinkWhenSubjectUnresolved() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
 
@@ -482,7 +482,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: si el comando no trae inscriptos, crea el link con 0 provisional")
     void syncCommissionsCreatesLinkWithZeroWhenEnrollmentUnresolved() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -505,7 +505,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: el proximo sync con inscriptos reales pisa el 0 provisional")
     void syncCommissionsOverwritesProvisionalZeroWithRealCount() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -530,7 +530,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: si el comando no trae inscriptos, conserva el valor existente del link")
     void syncCommissionsKeepsExistingEnrolledCountWhenEnrollmentUnresolved() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -604,7 +604,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: un link nuevo con cero inscriptos informados se crea activo")
     void syncCommissionsCreatesActiveLinkWithZeroEnrolled() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 0);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 0, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -628,7 +628,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("syncCommissions: un link nuevo sin inscriptos informados queda activo")
     void syncCommissionsKeepsNewLinkActiveWhenEnrollmentUnresolved() {
-        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
@@ -657,6 +657,10 @@ class CommissionServiceImplTest {
     }
 
     private void syncLink(SubjectCommission link, Integer enrolledCount) {
+        syncLink(link, enrolledCount, null);
+    }
+
+    private void syncLink(SubjectCommission link, Integer enrolledCount, Integer semester) {
         when(commissionRepository.findAll()).thenReturn(List.of(link.getCommission()));
         when(subjectRepository.findAll()).thenReturn(List.of(link.getSubject()));
         when(subjectCommissionRepository.findAll()).thenReturn(List.of(link));
@@ -665,7 +669,92 @@ class CommissionServiceImplTest {
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(link.getCommission().getAcademicPeriod()));
 
-        service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, enrolledCount)), 0);
+        service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, enrolledCount, semester)), 0);
+    }
+
+    private void stubNewLinkSync(Subject subject, StudyPlan studyPlan) {
+        when(commissionRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of());
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(annualPeriod()));
+        when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("syncCommissions: crea materia_comision con el cuatrimestre del comando")
+    void syncCommissionsCreatesLinkWithSemester() {
+        StudyPlan studyPlan = studyPlan();
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
+        stubNewLinkSync(subject, studyPlan);
+
+        service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, 2)), 0);
+
+        ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
+        verify(subjectCommissionRepository).save(saved.capture());
+        assertThat(saved.getValue().getSemester()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: crea materia_comision con cuatrimestre null cuando el comando no lo resuelve")
+    void syncCommissionsCreatesLinkWithNullSemester() {
+        StudyPlan studyPlan = studyPlan();
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
+        stubNewLinkSync(subject, studyPlan);
+
+        service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null)), 0);
+
+        ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
+        verify(subjectCommissionRepository).save(saved.capture());
+        assertThat(saved.getValue().getSemester()).isNull();
+    }
+
+    @Test
+    @DisplayName("syncCommissions: actualiza el cuatrimestre del link existente cuando cambió, con los inscriptos iguales")
+    void syncCommissionsUpdatesSemesterWhenChanged() {
+        SubjectCommission link = existingLink(30);
+        link.setSemester(1);
+
+        syncLink(link, 30, 2);
+
+        assertThat(link.getSemester()).isEqualTo(2);
+        verify(subjectCommissionRepository).save(link);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: actualiza el cuatrimestre aunque el comando no traiga inscriptos y conserva la cantidad")
+    void syncCommissionsUpdatesSemesterWithoutEnrolledCount() {
+        SubjectCommission link = existingLink(20);
+
+        syncLink(link, null, 1);
+
+        assertThat(link.getSemester()).isEqualTo(1);
+        assertThat(link.getEnrolledCount()).isEqualTo(20);
+        verify(subjectCommissionRepository).save(link);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: con cuatrimestre e inscriptos sin cambios no guarda el link")
+    void syncCommissionsDoesNotSaveWhenSemesterAndCountUnchanged() {
+        SubjectCommission link = existingLink(30);
+        link.setSemester(1);
+
+        syncLink(link, 30, 1);
+
+        verify(subjectCommissionRepository, never()).save(link);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: un cuatrimestre null en el comando pisa el valor existente del link")
+    void syncCommissionsClearsSemesterWhenCommandHasNone() {
+        SubjectCommission link = existingLink(30);
+        link.setSemester(1);
+
+        syncLink(link, 30, null);
+
+        assertThat(link.getSemester()).isNull();
+        verify(subjectCommissionRepository).save(link);
     }
 
     @Test

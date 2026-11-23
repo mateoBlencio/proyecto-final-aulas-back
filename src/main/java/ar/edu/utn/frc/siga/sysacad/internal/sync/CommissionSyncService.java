@@ -60,8 +60,9 @@ public class CommissionSyncService implements SysacadViewSyncer {
         SysacadSubjectCommissionDto enrollment = enrollments.get(new EnrollmentKey(
                 row.courseCode(), row.subjectCode(), row.specialtyCode(), row.studyPlanCode()));
         Integer enrolledCount = enrollment == null ? null : enrollment.enrolledCount();
+        Integer semester = enrollment == null ? null : enrollment.semester();
         return new CommissionSyncCommand(row.courseCode(), row.specialtyCode(), row.studyPlanCode(),
-                row.subjectCode(), row.academicYear(), enrolledCount);
+                row.subjectCode(), row.academicYear(), enrolledCount, semester);
     }
 
     private record EnrollmentKey(String courseCode, Integer subjectCode, Integer specialtyCode,

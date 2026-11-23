@@ -321,7 +321,7 @@ class SysacadCatalogMapperTest {
                 "10:30", "12:45", "10:30-12:45", 135,
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
-        assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 5, 2008, 115, 30));
+        assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 5, 2008, 115, 30, null));
     }
 
     @Test

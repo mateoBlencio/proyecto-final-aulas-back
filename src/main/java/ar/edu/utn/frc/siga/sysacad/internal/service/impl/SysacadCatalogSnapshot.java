@@ -23,6 +23,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -85,7 +86,24 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
 
     @Override
     public List<SysacadSubjectCommissionDto> findSubjectCommissions() {
-        return schedulesRaw.get().stream().map(mapper::toSubjectCommission).filter(Objects::nonNull).toList();
+        Map<SubjectCommissionKey, SubjectSchedule> scheduleByKey = new HashMap<>();
+        List<SysacadSubjectCommissionDto> rows = new ArrayList<>();
+        for (RawSchedule raw : schedulesRaw.get()) {
+            SysacadSubjectCommissionDto dto = mapper.toSubjectCommission(raw);
+            if (dto == null) {
+                continue;
+            }
+            rows.add(dto);
+            SubjectSchedule facts = scheduleByKey.computeIfAbsent(SubjectCommissionKey.of(dto),
+                    k -> new SubjectSchedule());
+            facts.subjectTerms().add(trimToNull(raw.comisionDictado()));
+            facts.commissionSemesters().add(raw.horarioCuatrimestre());
+        }
+        Map<SubjectCommissionKey, Integer> semesterByKey = new HashMap<>();
+        scheduleByKey.forEach((key, facts) -> semesterByKey.put(key, resolveSemester("ComisionDictado",
+                "curso=%s especialidad=%s plan=%s materia=%s".formatted(key.courseCode(), key.specialtyCode(),
+                        key.studyPlanCode(), key.subjectCode()), facts)));
+        return rows.stream().map(dto -> dto.withSemester(semesterByKey.get(SubjectCommissionKey.of(dto)))).toList();
     }
 
     @Override
@@ -137,32 +155,42 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
         if (facts == null) {
             return null;
         }
-        Set<String> subjectTerms = new HashSet<>(facts.subjectTerms());
-        subjectTerms.remove(null);
-        if (subjectTerms.size() > 1) {
-            log.warn("MateriaDictado en conflicto para especialidad={} plan={} materia={}: {}",
-                    raw.especialid(), raw.plan(), raw.materia(), subjectTerms);
+        String where = "especialidad=%s plan=%s materia=%s".formatted(raw.especialid(), raw.plan(), raw.materia());
+        Integer semester = resolveSemester("MateriaDictado", where, facts);
+        return semester == null ? null : TermType.fromSemester(semester).map(TermType::getLabel).orElse(null);
+    }
+
+    /**
+     * Resolves the semester (0 annual, 1, 2) from a dictado code ("A", "1", "2", "C") and the
+     * HorarioCuatrimestre values of the rows. Conflicting codes give null. Without a usable code ("C" or
+     * empty), the HorarioCuatrimestre values decide.
+     */
+    private static Integer resolveSemester(String field, String where, SubjectSchedule facts) {
+        Set<String> terms = new HashSet<>(facts.subjectTerms());
+        terms.remove(null);
+        if (terms.size() > 1) {
+            log.warn("{} en conflicto para {}: {}", field, where, terms);
             return null;
         }
-        String subjectTerm = subjectTerms.isEmpty() ? "" : subjectTerms.iterator().next();
-        return switch (subjectTerm) {
-            case "A" -> TermType.ANUAL.getLabel();
-            case "1" -> TermType.PRIMER_CUATRIMESTRE.getLabel();
-            case "2" -> TermType.SEGUNDO_CUATRIMESTRE.getLabel();
+        String term = terms.isEmpty() ? "" : terms.iterator().next();
+        return switch (term) {
+            case "A" -> TermType.ANUAL.getSemester();
+            case "1" -> TermType.PRIMER_CUATRIMESTRE.getSemester();
+            case "2" -> TermType.SEGUNDO_CUATRIMESTRE.getSemester();
             case "C" -> singleSemester(withoutZero(facts.commissionSemesters()));
             default -> semesterFromCommissions(facts.commissionSemesters());
         };
     }
 
     /**
-     * Without MateriaDictado, HorarioCuatrimestre = 0 means annual and is treated like in events
-     * ({@code SysacadCommissionResolver.termTypes}: it covers both semesters). A 0 in any row makes the subject
+     * Without a dictado code, HorarioCuatrimestre = 0 means annual and is treated like in events
+     * ({@code SysacadCommissionResolver.termTypes}: it covers both semesters). A 0 in any row makes it
      * annual, even when the rest is 1 or 2 (the annual schedule already covers both). Without a 0, a single
      * semester gives that semester; two different ones stay null.
      */
-    private static String semesterFromCommissions(Set<Integer> semesters) {
+    private static Integer semesterFromCommissions(Set<Integer> semesters) {
         if (semesters.contains(0)) {
-            return TermType.ANUAL.getLabel();
+            return TermType.ANUAL.getSemester();
         }
         return singleSemester(withoutZero(semesters));
     }
@@ -174,9 +202,9 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
         return cuatrimestrales;
     }
 
-    private static String singleSemester(Set<Integer> cuatrimestrales) {
+    private static Integer singleSemester(Set<Integer> cuatrimestrales) {
         if (cuatrimestrales.size() == 1) {
-            return TermType.fromSemester(cuatrimestrales.iterator().next()).map(TermType::getLabel).orElse(null);
+            return TermType.fromSemester(cuatrimestrales.iterator().next()).map(TermType::getSemester).orElse(null);
         }
         return null;
     }
@@ -190,6 +218,14 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
     }
 
     private record SubjectNaturalKey(Integer especialidad, Integer plan, Integer materia) {
+    }
+
+    private record SubjectCommissionKey(String courseCode, Integer specialtyCode, Integer studyPlanCode,
+            Integer subjectCode) {
+        static SubjectCommissionKey of(SysacadSubjectCommissionDto dto) {
+            return new SubjectCommissionKey(dto.courseCode(), dto.specialtyCode(), dto.studyPlanCode(),
+                    dto.subjectCode());
+        }
     }
 
     private record SubjectSchedule(Set<String> subjectTerms, Set<Integer> commissionSemesters) {
