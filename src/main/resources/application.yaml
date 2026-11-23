@@ -114,6 +114,13 @@ cors:
 siga:
   api:
     base-path: /v1
+  # Avisos en tiempo real por SSE (GET /v1/live). El reverse proxy no debe bufferear la respuesta
+  # (el back manda X-Accel-Buffering: no) y su read timeout tiene que superar heartbeat-interval.
+  realtime:
+    max-connection-duration: ${REALTIME_MAX_CONNECTION_DURATION:PT15M}
+    heartbeat-interval: PT25S
+    flush-interval: PT0.5S
+    max-connections: ${REALTIME_MAX_CONNECTIONS:500}
   audit:
     export:
       max-rows: 10000
