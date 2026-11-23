@@ -24,6 +24,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader.ViewRe
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -124,9 +125,12 @@ public class SysacadWriteRun {
                         execution.classesWithoutRoom.add(
                                 new ClassWithoutRoom(schedule.getId(), cancelled.occurrenceId(), cancelled.date()));
                     }
-                    case NotSendable notSendable -> scheduleWriter.recordEvent(schedule.getId(),
-                            ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, notSendable.occurrenceId(), null,
-                            notSendable.reason().name());
+                    case NotSendable notSendable -> {
+                        scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.DESTINATION_NOT_SENDABLE, null,
+                                null, notSendable.occurrenceId(), null, notSendable.reason().name());
+                        announce(schedule, notSendable.occurrenceId(), notSendable.date(),
+                                notSendable.roomsToAnnounce(), mode, pacer);
+                    }
                     case Send send when mode == SysacadWriteMode.SANDBOX -> {
                         scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_SEND, send.building(),
                                 send.room(), send.occurrenceId(), null, null);
@@ -145,19 +149,8 @@ public class SysacadWriteRun {
                             return;
                         }
                     }
-                    case NotifyOnly notify when mode == SysacadWriteMode.SANDBOX -> {
-                        scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_MESSAGE,
-                                notify.rooms().get(0).building(), notify.rooms().get(0).room(),
-                                notify.occurrenceId(), null, RoomRef.key(notify.rooms()));
-                        commissionMessageSender.logSandboxPreview(schedule, notify.date(), notify.rooms());
-                    }
-                    case NotifyOnly notify -> {
-                        if (!mode.sendsToSysacad()) {
-                            continue;
-                        }
-                        commissionMessageSender.sendRoomsUpdate(schedule, notify, pacer);
-                        scheduleWriter.recordAnnouncedRooms(schedule.getId(), RoomRef.key(notify.rooms()));
-                    }
+                    case NotifyOnly notify -> announce(schedule, notify.occurrenceId(), notify.date(),
+                            notify.rooms(), mode, pacer);
                     case NoRoom ignored -> {
                     }
                     default -> {
@@ -171,6 +164,21 @@ public class SysacadWriteRun {
         flushFailures(execution, true, now);
         if (execution.contactedSysacad) {
             stateService.clearOutage();
+        }
+    }
+
+    private void announce(SysacadSchedule schedule, Long occurrenceId, LocalDate date, List<RoomRef> rooms,
+            SysacadWriteMode mode, RequestPacer pacer) {
+        if (rooms.isEmpty()) {
+            return;
+        }
+        if (mode == SysacadWriteMode.SANDBOX) {
+            scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_MESSAGE, rooms.get(0).building(),
+                    rooms.get(0).room(), occurrenceId, null, RoomRef.key(rooms));
+            commissionMessageSender.logSandboxPreview(schedule, date, rooms);
+        } else if (mode.sendsToSysacad()) {
+            commissionMessageSender.sendRoomsUpdate(schedule, occurrenceId, date, rooms, pacer);
+            scheduleWriter.recordAnnouncedRooms(schedule.getId(), RoomRef.key(rooms));
         }
     }
 

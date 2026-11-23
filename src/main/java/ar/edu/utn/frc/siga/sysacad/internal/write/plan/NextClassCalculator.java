@@ -82,8 +82,29 @@ public final class NextClassCalculator {
         ClassroomSysacadRefDto ref = refsByClassroom.get(classroomId);
         DestinationNotSendableReason invalid = invalidReason(ref);
         if (invalid != null) {
-            return new NotSendable(occurrenceId, slot.date(), invalid);
+            List<RoomRef> toAnnounce = List.of();
+            if (invalid == DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD && isAnnounceable(ref)
+                    && startsAfter(slot, now)) {
+                List<RoomRef> rooms = roomsOf(occurrenceId, ref, mirrorClassroomsByPrincipal, refsByClassroom);
+                if (!isAlreadyAnnounced(schedule, rooms)) {
+                    toAnnounce = rooms;
+                }
+            }
+            return new NotSendable(occurrenceId, slot.date(), invalid, toAnnounce);
         }
+        List<RoomRef> rooms = roomsOf(occurrenceId, ref, mirrorClassroomsByPrincipal, refsByClassroom);
+        if (!(Objects.equals(ref.buildingCode(), schedule.getKnownBuilding())
+                && Objects.equals(ref.roomNumber(), schedule.getKnownRoom()))) {
+            return sendUnlessStarted(slot, now, ref.buildingCode(), ref.roomNumber(), rooms);
+        }
+        if (isAlreadyAnnounced(schedule, rooms) || !startsAfter(slot, now)) {
+            return new Unchanged(occurrenceId, slot.date());
+        }
+        return new NotifyOnly(occurrenceId, slot.date(), rooms);
+    }
+
+    private static List<RoomRef> roomsOf(Long occurrenceId, ClassroomSysacadRefDto ref,
+            Map<Long, List<Long>> mirrorClassroomsByPrincipal, Map<Long, ClassroomSysacadRefDto> refsByClassroom) {
         List<RoomRef> rooms = new ArrayList<>();
         rooms.add(new RoomRef(ref.buildingCode(), ref.roomNumber()));
         for (Long mirrorClassroomId : mirrorClassroomsByPrincipal.getOrDefault(occurrenceId, List.of())) {
@@ -95,16 +116,18 @@ public final class NextClassCalculator {
             }
             rooms.add(new RoomRef(mirror.buildingCode(), mirror.roomNumber()));
         }
-        if (!(Objects.equals(ref.buildingCode(), schedule.getKnownBuilding())
-                && Objects.equals(ref.roomNumber(), schedule.getKnownRoom()))) {
-            return sendUnlessStarted(slot, now, ref.buildingCode(), ref.roomNumber(), rooms);
-        }
+        return rooms;
+    }
+
+    private static boolean isAlreadyAnnounced(SysacadSchedule schedule, List<RoomRef> rooms) {
         String announced = schedule.getAnnouncedRooms() != null ? schedule.getAnnouncedRooms()
                 : RoomRef.keyOf(schedule.getKnownBuilding(), schedule.getKnownRoom());
-        if (RoomRef.key(rooms).equals(announced) || !startsAfter(slot, now)) {
-            return new Unchanged(occurrenceId, slot.date());
-        }
-        return new NotifyOnly(occurrenceId, slot.date(), rooms);
+        return RoomRef.key(rooms).equals(announced);
+    }
+
+    private static boolean isAnnounceable(ClassroomSysacadRefDto ref) {
+        return ref.roomNumber() != null && ref.roomNumber() > 0 && ref.roomNumber() != RELEASED_ROOM
+                && ref.buildingCode() != null;
     }
 
     private static boolean startsAfter(OccurrenceSlotDto slot, LocalDateTime now) {
