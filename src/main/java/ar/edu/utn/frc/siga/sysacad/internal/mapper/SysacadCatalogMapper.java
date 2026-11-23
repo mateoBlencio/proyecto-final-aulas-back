@@ -124,7 +124,8 @@ public class SysacadCatalogMapper {
                 raw.especialidad(),
                 raw.plan(),
                 raw.materia(),
-                raw.inscriptos());
+                raw.inscriptos(),
+                null);
     }
 
     public SysacadAcademicEventDto toAcademicEvent(RawSchedule raw) {

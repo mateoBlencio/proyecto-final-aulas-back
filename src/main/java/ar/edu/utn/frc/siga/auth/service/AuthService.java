@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.auth.service;
 import ar.edu.utn.frc.siga.auth.dto.request.LoginRequest;
 import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
+import ar.edu.utn.frc.siga.auth.model.User;
 import jakarta.servlet.http.HttpServletRequest;
 
 public interface AuthService {
@@ -12,4 +13,6 @@ public interface AuthService {
     TokenResponse refresh(RefreshTokenRequest request);
 
     void logout(RefreshTokenRequest request);
+
+    TokenResponse startSession(User user);
 }

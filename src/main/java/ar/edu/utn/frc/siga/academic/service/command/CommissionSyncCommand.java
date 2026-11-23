@@ -9,5 +9,6 @@ public record CommissionSyncCommand(
         Integer studyPlanCode,
         Integer subjectCode,
         Integer academicYear,
-        Integer enrolledCount) {
+        Integer enrolledCount,
+        Integer semester) {
 }

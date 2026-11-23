@@ -25,7 +25,7 @@ class MockMvcAsHelperIntegrationTest extends AbstractIntegrationTest {
     void mockMvcAs_sameEmailOtherRole_replacesAssignment() throws Exception {
         String email = "helper." + System.nanoTime() + "@frc.utn.edu.ar";
 
-        mockMvcAs(email, SystemRole.SUBSECRETARIA).perform(get("/v1/users")).andExpect(status().isOk());
+        mockMvcAs(email, SystemRole.ADMINISTRADOR).perform(get("/v1/users")).andExpect(status().isOk());
         mockMvcAs(email, SystemRole.CONSULTA).perform(get("/v1/users")).andExpect(status().isForbidden());
 
         Long userId = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();

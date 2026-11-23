@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.notification.internal.service;
 
 import ar.edu.utn.frc.siga.notification.api.NotificationRecipient;
+import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.notification.internal.channel.ChannelRegistry;
 import ar.edu.utn.frc.siga.notification.internal.channel.ChannelSender;
 import ar.edu.utn.frc.siga.notification.internal.config.NotificationProperties;
@@ -37,6 +38,11 @@ class NotificationDispatcher {
             return;
         }
 
+        if (isExpired(notification)) {
+            notification.markDiscarded("vencida antes de enviarse");
+            return;
+        }
+
         Optional<ChannelSender> sender = channelRegistry.find(notification.getChannel());
         if (sender.isEmpty()) {
             notification.markDiscarded("canal sin implementación disponible");
@@ -58,6 +64,12 @@ class NotificationDispatcher {
             log.warn("Fallo al enviar la notificación {} (intento {}): {}",
                     id, notification.getAttempts(), e.getMessage());
         }
+    }
+
+    private static boolean isExpired(Notification notification) {
+        Duration expiresAfter = NotificationTemplate.expiresAfter(notification.getTemplate());
+        return expiresAfter != null
+                && notification.getCreatedAt().plus(expiresAfter).isBefore(Instant.now());
     }
 
     private static List<String> splitAddresses(String addresses) {

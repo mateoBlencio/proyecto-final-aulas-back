@@ -30,11 +30,11 @@ class CameraCountPermissionTest {
 
     @ParameterizedTest(name = "{0} con alcance {1} -> tiene PERM_CAMERA_COUNT_RUN: {2}")
     @CsvSource({
-            "SUBSECRETARIA, GLOBAL, true",
+            "ADMINISTRADOR, GLOBAL, true",
             "AUXILIAR_AULICO, BUILDING, true",
             "CONSULTA, GLOBAL, false"
     })
-    @DisplayName("SUBSECRETARIA y AUXILIAR_AULICO (acotado a un edificio) reciben la authority; CONSULTA no")
+    @DisplayName("ADMINISTRADOR y AUXILIAR_AULICO (acotado a un edificio) reciben la authority; CONSULTA no")
     void roleReceivesAuthority(SystemRole role, ScopeType scopeType, boolean expected) {
         Long buildingId = scopeType == ScopeType.BUILDING ? 5L : null;
         User user = User.builder().id(1L).email("u@frc.utn.edu.ar").enabled(true)

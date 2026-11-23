@@ -280,7 +280,8 @@ public class AllocationController {
     @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Desasignar aulas en lote",
                description = "Libera el aula de cada item del lote (borra la asignación). "
-                       + "409 si alguna ocurrencia del lote ya pasó. Atómico.")
+                       + "409 si alguna ocurrencia del lote ya pasó. Atómico. Con eventId, 'roomSlot' (opcional) limita "
+                       + "el item a una sola aula de la clase por su orden (1 principal, 2+ espejos).")
     public ResponseEntity<List<DeallocatedOccurrenceDto>> deallocate(@Valid @RequestBody DeallocationBatchRequestDto dto) {
         log.debug("DELETE /v1/allocations: items={}", dto.items().size());
         List<DeallocatedOccurrenceDto> response = allocationService.deallocate(commandMapper.toDeallocationCommand(dto));
@@ -301,7 +302,8 @@ public class AllocationController {
                        + "ONLY_SELECTED no se arrastran los espejos no seleccionados; una principal seleccionada pasa "
                        + "al aula de uno de ellos (el de mayor capacidad), que queda MIRROR_RETIRED, y vuelve con "
                        + "'movedToClassroomId'. 409 si ese espejo no tiene aula disponible: la respuesta lleva "
-                       + "'dates' y se puede reenviar con ALL.")
+                       + "'dates' y se puede reenviar con ALL. Con eventId, 'roomSlot' (opcional) limita el item a una sola "
+                       + "aula de la clase por su orden (1 principal, 2+ espejos).")
     public ResponseEntity<List<ReleasedOccurrenceDto>> release(@Valid @RequestBody ReleaseBatchRequestDto dto) {
         log.debug("POST /v1/allocations/releases: items={}, reason={}", dto.items().size(), dto.reason());
         List<ReleasedOccurrenceDto> response = allocationService.release(commandMapper.toReleaseCommand(dto));
@@ -361,7 +363,8 @@ public class AllocationController {
                description = "Devuelve a NEEDS_ROOM las ocurrencias liberadas del lote y sus espejos liberados "
                        + "(los MIRROR_RETIRED no vuelven). Con el id de la principal alcanza. No asigna aula; cada "
                        + "ocurrencia conserva su aula anterior. 403 si alguna aula anterior, incluida la de un "
-                       + "espejo, está fuera del alcance; 409 si alguna ocurrencia ya pasó. Atómico.")
+                       + "espejo, está fuera del alcance; 409 si alguna ocurrencia ya pasó. Atómico. Con eventId, "
+                       + "'roomSlot' (opcional) limita la reversión a una sola aula de la clase (1 principal, 2+ espejos).")
     public ResponseEntity<List<Long>> cancelRelease(@Valid @RequestBody DeallocationBatchRequestDto dto) {
         log.debug("DELETE /v1/allocations/releases: items={}", dto.items().size());
         List<Long> response = allocationService.cancelRelease(commandMapper.toDeallocationCommand(dto));

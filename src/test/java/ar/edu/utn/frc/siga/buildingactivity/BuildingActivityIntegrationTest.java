@@ -89,7 +89,7 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
     private RoomRequestRepository roomRequestRepository;
 
     @Test
-    @DisplayName("reasignar como SUBSECRETARIA deja una actividad con su linea, con el jsonb como arreglo de objetos")
+    @DisplayName("reasignar como ADMINISTRADOR deja una actividad con su linea, con el jsonb como arreglo de objetos")
     void reallocateLeavesActivityWithLine() throws Exception {
         Scenario s = scenario();
 
@@ -225,7 +225,7 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
     void redeliveredEventDoesNotDuplicate() throws Exception {
         Scenario s = scenario();
         String actor = "sub-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
-        mockMvcAs(actor, SystemRole.SUBSECRETARIA);
+        mockMvcAs(actor, SystemRole.ADMINISTRADOR);
         ClassroomMovements event = new ClassroomMovements(UUID.randomUUID().toString(), actor, AllocationSource.MANUAL,
                 "reentrega", Instant.now(), List.of(new Change(s.occurrence().getId(), s.eventId(), s.date(), START,
                 START.plusMinutes(DURATION), s.from().getId(), s.to().getId())));
@@ -440,6 +440,27 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
         assertThat(listBuildingNames(auxiliary, null, "seen", "true", "source", "MANUAL")).containsExactly("B");
         auxiliary.perform(get("/v1/building-activity").param("seen", "false").param("size", "1"))
                 .andExpect(jsonPath("$.page.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("actorFullName trae nombre y apellido del usuario y es null si el actor no existe; actor no cambia")
+    void exposesActorFullName() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliary = auxiliaryOf(building);
+        String known = "known-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
+        mockMvcAs(known, SystemRole.ADMINISTRADOR);
+        String unknown = "ghost-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
+        seedActivity(building, "A", known, AllocationSource.MANUAL, "2026-10-10T10:00:00Z", 1);
+        seedActivity(building, "B", unknown, AllocationSource.MANUAL, "2026-10-10T11:00:00Z", 1);
+
+        String body = auxiliary.perform(get("/v1/building-activity").param("sort", "occurredAt,asc"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        JsonNode content = objectMapper.readTree(body).get("content");
+        assertThat(content.get(0).get("actor").asText()).isEqualTo(known);
+        assertThat(content.get(0).get("actorFullName").asText()).isEqualTo("Fixture User");
+        assertThat(content.get(1).get("actor").asText()).isEqualTo(unknown);
+        assertThat(content.get(1).get("actorFullName").isNull()).isTrue();
     }
 
     private long seedActivity(Building building, String name, String actor, AllocationSource source, String occurredAt,

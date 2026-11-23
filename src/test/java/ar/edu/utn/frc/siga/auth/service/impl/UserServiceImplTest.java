@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import ar.edu.utn.frc.siga.auth.config.AuthDomainProperties;
 import ar.edu.utn.frc.siga.auth.dto.request.CreateUserRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
+import ar.edu.utn.frc.siga.auth.exception.FieldValidationException;
 import ar.edu.utn.frc.siga.auth.exception.UserDomainException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.mapper.UserMapper;
@@ -25,7 +26,10 @@ import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,23 +65,31 @@ class UserServiceImplTest {
     @Mock
     private AuthDomainProperties authDomainProperties;
 
+    private final PasswordPolicy passwordPolicy = new PasswordPolicy();
+
     private UserServiceImpl service;
 
     private static final String CREATOR_EMAIL = "admin@frc.utn.edu.ar";
 
     @BeforeEach
     void setUp() {
-        service = new UserServiceImpl(userRepository, passwordEncoder, refreshTokenService,
+        service = new UserServiceImpl(userRepository, passwordEncoder, passwordPolicy, refreshTokenService,
                 userMapper, roleAssignmentComposer, roleAssignmentService, authDomainProperties);
         lenient().when(roleAssignmentComposer.composeAll(any())).thenReturn(List.of());
     }
 
     private CreateUserRequestDto createDto(String email) {
-        return createDto(email, "supersegura");
+        return createDto(email, "clave-segura-2026");
     }
 
     private CreateUserRequestDto createDto(String email, String password) {
         return new CreateUserRequestDto(email, password, "Nombre", "Apellido", null);
+    }
+
+    private static String twoByteChars(int count) {
+        return IntStream.range(0, count)
+                .mapToObj(i -> new String(Character.toChars(0xC0 + i)))
+                .collect(Collectors.joining());
     }
 
     private User existing(Long id, String email) {
@@ -95,7 +107,7 @@ class UserServiceImplTest {
     void createHappyPath() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("nuevo@frc.utn.edu.ar")).thenReturn(false);
-        when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
+        when(passwordEncoder.encode("clave-segura-2026")).thenReturn("HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(1L, "nuevo@frc.utn.edu.ar", "Nombre", "Apellido", List.of()));
@@ -137,12 +149,12 @@ class UserServiceImplTest {
     @Test
     @DisplayName("create con AuthDomainProperties real: subdominio institucional → guarda el usuario")
     void createSubdomainWithRealDomainProperties() {
-        UserServiceImpl serviceWithRealDomain = new UserServiceImpl(userRepository, passwordEncoder,
+        UserServiceImpl serviceWithRealDomain = new UserServiceImpl(userRepository, passwordEncoder, passwordPolicy,
                 refreshTokenService, userMapper, roleAssignmentComposer, roleAssignmentService,
                 new AuthDomainProperties());
         String email = "jperez@sistemas.frc.utn.edu.ar";
         when(userRepository.existsByEmail(email)).thenReturn(false);
-        when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
+        when(passwordEncoder.encode("clave-segura-2026")).thenReturn("HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(1L, email, "Nombre", "Apellido", List.of()));
@@ -160,7 +172,7 @@ class UserServiceImplTest {
         String normalized = "jperez@sistemas.frc.utn.edu.ar";
         when(authDomainProperties.isAllowedEmail(normalized)).thenReturn(true);
         when(userRepository.existsByEmail(normalized)).thenReturn(false);
-        when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
+        when(passwordEncoder.encode("clave-segura-2026")).thenReturn("HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(1L, normalized, "Nombre", "Apellido", List.of()));
@@ -174,35 +186,35 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("create: password de 40 caracteres de 2 bytes (80 bytes UTF-8) → UserDomainException y no guarda")
+    @DisplayName("create: password de 40 caracteres distintos de 2 bytes (80 bytes UTF-8) → FieldValidationException en password y no guarda")
     void createPasswordOver72BytesThrows() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("nuevo@frc.utn.edu.ar")).thenReturn(false);
 
-        assertThatThrownBy(() -> service.create(createDto("nuevo@frc.utn.edu.ar", "é".repeat(40)), CREATOR_EMAIL))
-                .isInstanceOf(UserDomainException.class)
-                .hasMessage("Password must not exceed 72 bytes in UTF-8");
+        assertThatThrownBy(() -> service.create(createDto("nuevo@frc.utn.edu.ar", twoByteChars(40)), CREATOR_EMAIL))
+                .isInstanceOfSatisfying(FieldValidationException.class, e ->
+                        assertThat((Map<Object, Object>) e.getProperties().get("errors")).containsOnlyKeys("password"));
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("create: password de 73 bytes UTF-8 (36 caracteres de 2 bytes y uno de 1) → UserDomainException")
+    @DisplayName("create: password de 73 bytes UTF-8 (36 caracteres distintos de 2 bytes y uno de 1) → FieldValidationException")
     void createPassword73BytesThrows() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("nuevo@frc.utn.edu.ar")).thenReturn(false);
 
-        assertThatThrownBy(() -> service.create(createDto("nuevo@frc.utn.edu.ar", "é".repeat(36) + "a"), CREATOR_EMAIL))
-                .isInstanceOf(UserDomainException.class);
+        assertThatThrownBy(() -> service.create(createDto("nuevo@frc.utn.edu.ar", twoByteChars(36) + "a"), CREATOR_EMAIL))
+                .isInstanceOf(FieldValidationException.class);
 
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("create: password de exactamente 72 bytes UTF-8 (36 caracteres de 2 bytes) → hashea y guarda")
+    @DisplayName("create: password de exactamente 72 bytes UTF-8 (36 caracteres distintos de 2 bytes) → hashea y guarda")
     void createPasswordOfExactly72BytesPasses() {
-        String password = "é".repeat(36);
+        String password = twoByteChars(36);
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("nuevo@frc.utn.edu.ar")).thenReturn(false);
         when(passwordEncoder.encode(password)).thenReturn("HASH");
@@ -231,7 +243,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("create con AuthDomainProperties real: dominio externo → UserDomainException y no guarda")
     void createExternalDomainWithRealDomainProperties() {
-        UserServiceImpl serviceWithRealDomain = new UserServiceImpl(userRepository, passwordEncoder,
+        UserServiceImpl serviceWithRealDomain = new UserServiceImpl(userRepository, passwordEncoder, passwordPolicy,
                 refreshTokenService, userMapper, roleAssignmentComposer, roleAssignmentService,
                 new AuthDomainProperties());
 
@@ -312,15 +324,15 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(false): la única SUBSECRETARIA habilitada no se puede inhabilitar")
-    void disableLastSubsecretariaThrows() {
+    @DisplayName("setEnabled(false): la única ADMINISTRADOR habilitada no se puede inhabilitar")
+    void disableLastAdministratorThrows() {
         User user = existing(7L, "sub@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(user));
+        when(userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(user));
 
         assertThatThrownBy(() -> service.setEnabled(7L, false, CREATOR_EMAIL))
                 .isInstanceOf(UserDomainException.class)
-                .hasMessage("The last enabled SUBSECRETARIA cannot be disabled");
+                .hasMessage("No se puede inhabilitar al último Administrador habilitado.");
 
         assertThat(user.getEnabled()).isTrue();
         verify(userRepository, never()).save(any());
@@ -328,12 +340,12 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(false): con dos SUBSECRETARIA habilitadas se puede inhabilitar a una y se revocan sus tokens")
-    void disableOneOfTwoSubsecretariasPasses() {
+    @DisplayName("setEnabled(false): con dos ADMINISTRADOR habilitadas se puede inhabilitar a una y se revocan sus tokens")
+    void disableOneOfTwoAdministratorsPasses() {
         User user = existing(7L, "sub@frc.utn.edu.ar");
         User other = existing(8L, "otra.sub@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(user, other));
+        when(userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(user, other));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(7L, "sub@frc.utn.edu.ar", "Nombre", "Apellido", null));
@@ -345,12 +357,12 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(false): un usuario que no es la SUBSECRETARIA se inhabilita aunque quede una sola habilitada")
-    void disableAuxiliarWithSingleEnabledSubsecretariaPasses() {
+    @DisplayName("setEnabled(false): un usuario que no es la ADMINISTRADOR se inhabilita aunque quede una sola habilitada")
+    void disableAuxiliarWithSingleEnabledAdministratorPasses() {
         User auxiliar = existing(7L, "aux@frc.utn.edu.ar");
-        User onlySubsecretaria = existing(8L, "sub@frc.utn.edu.ar");
+        User onlyAdministrator = existing(8L, "sub@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(auxiliar));
-        when(userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(onlySubsecretaria));
+        when(userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(onlyAdministrator));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(7L, "aux@frc.utn.edu.ar", "Nombre", "Apellido", null));
@@ -362,7 +374,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(true): habilitar no valida autoinhabilitación ni consulta las SUBSECRETARIA")
+    @DisplayName("setEnabled(true): habilitar no valida autoinhabilitación ni consulta las ADMINISTRADOR")
     void enableSkipsDisableValidations() {
         User user = existing(7L, "u@frc.utn.edu.ar");
         user.setEnabled(false);

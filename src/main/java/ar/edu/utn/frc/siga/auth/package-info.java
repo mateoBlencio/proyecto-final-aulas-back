@@ -1,4 +1,4 @@
-@ApplicationModule(allowedDependencies = { "common", "space :: api", "audit :: api" })
+@ApplicationModule(allowedDependencies = { "common", "space :: api", "audit :: api", "notification :: api" })
 package ar.edu.utn.frc.siga.auth;
 
 import org.springframework.modulith.ApplicationModule;

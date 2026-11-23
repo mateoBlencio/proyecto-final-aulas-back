@@ -10,7 +10,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.config.CommissionMessageMode;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
-import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
@@ -77,12 +76,13 @@ public class CommissionMessageSender {
         }
     }
 
-    // Mismo flujo que el mensaje posterior a un envío, pero sin cambio de aula principal: solo cambió el conjunto.
-    public void sendRoomsUpdate(SysacadSchedule schedule, NotifyOnly decision, RequestPacer pacer) {
+    // Aviso sin envío a SysAcad: cambió solo el conjunto de aulas o la principal está deshabilitada en SysAcad.
+    public void sendRoomsUpdate(SysacadSchedule schedule, Long occurrenceId, LocalDate date, List<RoomRef> rooms,
+            RequestPacer pacer) {
         if (!enabledFor(schedule)) {
             return;
         }
-        deliver(schedule, decision.occurrenceId(), decision.date(), decision.rooms(), pacer);
+        deliver(schedule, occurrenceId, date, rooms, pacer);
     }
 
     private void deliver(SysacadSchedule schedule, Long occurrenceId, LocalDate date, List<RoomRef> rooms,

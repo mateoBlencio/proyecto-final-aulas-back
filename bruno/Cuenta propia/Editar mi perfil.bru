@@ -1,0 +1,24 @@
+meta {
+  name: Editar mi perfil
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/v1/users/me
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "firstName": "Nombre",
+    "lastName": "Apellido"
+  }
+}
+
+docs {
+  PATCH /v1/users/me. Edita el nombre y apellido del usuario autenticado.
+  Se recortan los espacios de los extremos. 400 con errors.firstName / errors.lastName
+  si están en blanco, superan 100 caracteres o tienen caracteres de control.
+}

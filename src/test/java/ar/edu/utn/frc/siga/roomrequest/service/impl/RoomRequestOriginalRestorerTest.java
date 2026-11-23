@@ -156,9 +156,9 @@ class RoomRequestOriginalRestorerTest {
     @DisplayName("captureOriginals: devuelve aula y origen actuales por ocurrencia y omite las que no tienen aula")
     void captureOriginalsOmiteSinAula() {
         OccurrenceResponseDto occ10 = new OccurrenceResponseDto(10L, 1L, DATE_1, OccurrenceStatus.NEEDS_ROOM,
-                LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null);
+                LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null, null, null);
         OccurrenceResponseDto occ11 = new OccurrenceResponseDto(11L, 1L, DATE_2, OccurrenceStatus.NEEDS_ROOM,
-                LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null);
+                LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null, null, null);
         when(allocationService.findByOccurrenceIds(List.of(10L, 11L))).thenReturn(List.of(
                 new AllocationResponseDto(1L, AllocationSource.SYSACAD, Instant.now(), null, occ10, null, classroom(100L, 4), null),
                 new AllocationResponseDto(2L, AllocationSource.MANUAL, Instant.now(), null, occ11, null, null, null)));

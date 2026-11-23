@@ -68,9 +68,9 @@ class RoleAssignmentAuditLabelProviderTest {
     void labels_roleAndEmail() {
         when(userRepository.findEmailsByIdIn(any())).thenReturn(List.of(new Email(7L, "ana@frc.utn.edu.ar")));
 
-        Map<String, String> labels = provider.labels(List.of(record("1", "SUBSECRETARIA", 7L)));
+        Map<String, String> labels = provider.labels(List.of(record("1", "ADMINISTRADOR", 7L)));
 
-        assertThat(labels).containsExactly(Map.entry("1", "Subsecretaría de ana@frc.utn.edu.ar"));
+        assertThat(labels).containsExactly(Map.entry("1", "Administrador de ana@frc.utn.edu.ar"));
     }
 
     @Test
@@ -81,14 +81,14 @@ class RoleAssignmentAuditLabelProviderTest {
                 List.of(new Email(7L, "ana@frc.utn.edu.ar"), new Email(8L, "luis@frc.utn.edu.ar")));
 
         Map<String, String> labels = provider.labels(List.of(
-                record("1", "CONSULTA", 7L), record("2", "SUBSECRETARIA", 7L), record("3", "CONSULTA", 8L)));
+                record("1", "CONSULTA", 7L), record("2", "ADMINISTRADOR", 7L), record("3", "CONSULTA", 8L)));
 
         ArgumentCaptor<Collection<Long>> ids = ArgumentCaptor.forClass(Collection.class);
         verify(userRepository, times(1)).findEmailsByIdIn(ids.capture());
         assertThat(ids.getValue()).containsExactlyInAnyOrder(7L, 8L);
         assertThat(labels).containsOnly(
                 Map.entry("1", "Consulta de ana@frc.utn.edu.ar"),
-                Map.entry("2", "Subsecretaría de ana@frc.utn.edu.ar"),
+                Map.entry("2", "Administrador de ana@frc.utn.edu.ar"),
                 Map.entry("3", "Consulta de luis@frc.utn.edu.ar"));
     }
 

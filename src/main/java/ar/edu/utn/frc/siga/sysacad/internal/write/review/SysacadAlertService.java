@@ -94,9 +94,14 @@ public class SysacadAlertService {
                 news.stream().map(SysacadScheduleLogEntry::getScheduleId).collect(Collectors.toSet())),
                 SysacadSchedule::getId);
         Map<Long, OccurrenceSlotDto> slots = slotsOf(news);
+        Set<String> announced = logRepository.findBetween(List.of(ScheduleLogType.COMMISSION_MESSAGE), after, until)
+                .stream().filter(message -> "SENT".equals(message.getResult()))
+                .map(message -> message.getScheduleId() + ":" + message.getOccurrenceId())
+                .collect(Collectors.toSet());
 
         List<String> lines = news.stream().limit(properties.getWrite().alertMailMaxLines())
-                .map(entry -> describe(entry, schedules.get(entry.getScheduleId()), slots))
+                .map(entry -> describe(entry, schedules.get(entry.getScheduleId()), slots)
+                        + announcedText(entry, announced))
                 .toList();
         String count = news.size() + (news.size() == 1 ? " horario necesita" : " horarios necesitan");
         Map<String, Object> model = new HashMap<>();
@@ -158,7 +163,7 @@ public class SysacadAlertService {
 
     private List<NotificationRecipient> recipients() {
         Map<String, NotificationRecipient> byEmail = new LinkedHashMap<>();
-        for (UserResponseDto user : userService.findByRole(SystemRole.SUBSECRETARIA)) {
+        for (UserResponseDto user : userService.findByRole(SystemRole.ADMINISTRADOR)) {
             byEmail.putIfAbsent(user.email(), new NotificationRecipient(user.firstName() + " " + user.lastName(),
                     user.email()));
         }
@@ -194,6 +199,13 @@ public class SysacadAlertService {
                 .map(slot -> DATE.format(slot.date().atTime(slot.startTime())))
                 .collect(Collectors.joining(", "));
         return subject + ": " + reasonText(entry) + (classes.isEmpty() ? "" : " (clase: " + classes + ")");
+    }
+
+    private static String announcedText(SysacadScheduleLogEntry entry, Set<String> announced) {
+        boolean disabled = entry.getType() == ScheduleLogType.DESTINATION_NOT_SENDABLE
+                && DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD.name().equals(entry.getReason());
+        return disabled && announced.contains(entry.getScheduleId() + ":" + entry.getOccurrenceId())
+                ? "; se avisó a los alumnos por autogestión" : "";
     }
 
     private static String reasonText(SysacadScheduleLogEntry entry) {

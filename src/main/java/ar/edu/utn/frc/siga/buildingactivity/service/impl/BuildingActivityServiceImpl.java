@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.buildingactivity.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.audit.AuditUserNames;
 import ar.edu.utn.frc.siga.buildingactivity.dto.response.BuildingActivityDto;
 import ar.edu.utn.frc.siga.buildingactivity.model.ActivityLine;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
@@ -35,7 +36,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +53,7 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
     private final BuildingActivitySeenRepository seenRepository;
     private final BuildingScopeResolver buildingScopeResolver;
     private final ObjectMapper objectMapper;
+    private final AuditUserNames userNames;
 
     @Override
     @Transactional(readOnly = true)
@@ -92,7 +96,9 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
         }
         Pageable page = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_PAGE_SIZE));
         spec = spec.and(ordering);
-        return repository.findAll(spec, page).map(activity -> toDto(activity, user, watermark));
+        Page<BuildingActivity> result = repository.findAll(spec, page);
+        Map<String, String> fullNames = fullNamesOf(result.getContent());
+        return result.map(activity -> toDto(activity, user, watermark, fullNames));
     }
 
     @Override
@@ -140,12 +146,19 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
         return seenRepository.findById(user).map(BuildingActivitySeen::getLastSeenActivityId).orElse(0L);
     }
 
-    private BuildingActivityDto toDto(BuildingActivity activity, String user, long watermark) {
+    private Map<String, String> fullNamesOf(List<BuildingActivity> activities) {
+        Set<String> actors = activities.stream().map(BuildingActivity::getActor).collect(Collectors.toSet());
+        return actors.isEmpty() ? Map.of() : userNames.fullNames(actors);
+    }
+
+    private BuildingActivityDto toDto(BuildingActivity activity, String user, long watermark,
+                                      Map<String, String> fullNames) {
         return new BuildingActivityDto(
                 activity.getId(),
                 activity.getType(),
                 new BuildingActivityDto.BuildingRef(activity.getBuildingId(), activity.getBuildingName()),
                 activity.getActor(),
+                fullNames.get(activity.getActor()),
                 activity.getSource(),
                 activity.getReason(),
                 activity.getOccurredAt(),

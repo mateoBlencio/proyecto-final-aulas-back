@@ -58,6 +58,13 @@ public class SubjectCommission extends SoftDeletableEntity {
     @Builder.Default
     private Boolean inPerson = true;
 
+    @Column(name = "cuatrimestre")
+    private Integer semester;
+
+    public String termLabel() {
+        return TermType.fromSemester(semester).map(TermType::getLabel).orElse(null);
+    }
+
     public SubjectCommissionId key() {
         return new SubjectCommissionId(subject.getId(), commission.getId());
     }

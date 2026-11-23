@@ -30,7 +30,7 @@ public sealed interface NextClassDecision {
     record NoRoomAfterCancel(Long occurrenceId, Long itemId, LocalDate date) implements NextClassDecision {
     }
 
-    record NotSendable(Long occurrenceId, LocalDate date, DestinationNotSendableReason reason)
-            implements NextClassDecision {
+    record NotSendable(Long occurrenceId, LocalDate date, DestinationNotSendableReason reason,
+            List<RoomRef> roomsToAnnounce) implements NextClassDecision {
     }
 }

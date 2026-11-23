@@ -118,7 +118,7 @@ class ClassScheduleServiceTest {
         LocalDate monday = LocalDate.of(2026, 9, 7);
         when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
                 new OccurrenceResponseDto(1L, 101L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(14, 0), LocalTime.of(16, 0), null, null, null)));
+                        LocalTime.of(14, 0), LocalTime.of(16, 0), null, null, null, null, null)));
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
                 recurring(101L, DayOfWeek.MONDAY, LocalTime.of(14, 0), 120)));
@@ -135,9 +135,9 @@ class ClassScheduleServiceTest {
         LocalDate monday = LocalDate.of(2026, 9, 7);
         when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
                 new OccurrenceResponseDto(1L, 100L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(8, 0), LocalTime.of(10, 0), null, null, null),
+                        LocalTime.of(8, 0), LocalTime.of(10, 0), null, null, null, null, null),
                 new OccurrenceResponseDto(2L, 101L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(14, 0), LocalTime.of(16, 0), null, null, null)));
+                        LocalTime.of(14, 0), LocalTime.of(16, 0), null, null, null, null, null)));
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
                 recurring(101L, DayOfWeek.MONDAY, LocalTime.of(14, 0), 120)));
@@ -155,9 +155,9 @@ class ClassScheduleServiceTest {
         LocalDate tuesday = LocalDate.of(2026, 9, 8);
         when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
                 new OccurrenceResponseDto(1L, 100L, tuesday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null),
+                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null, null, null),
                 new OccurrenceResponseDto(2L, 101L, tuesday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null)));
+                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null, null, null)));
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120),
                 recurring(101L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120)));
@@ -220,9 +220,9 @@ class ClassScheduleServiceTest {
         LocalDate monday = LocalDate.of(2026, 9, 7);
         when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
                 new OccurrenceResponseDto(1L, 100L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(10, 25), LocalTime.of(11, 55), null, null, null),
+                        LocalTime.of(10, 25), LocalTime.of(11, 55), null, null, null, null, null),
                 new OccurrenceResponseDto(2L, 101L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(20, 40), LocalTime.of(22, 55), null, null, null)));
+                        LocalTime.of(20, 40), LocalTime.of(22, 55), null, null, null, null, null)));
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(10, 25), 90),
                 recurring(101L, DayOfWeek.MONDAY, LocalTime.of(20, 40), 135)));
@@ -240,13 +240,13 @@ class ClassScheduleServiceTest {
         LocalDate tuesday = LocalDate.of(2026, 9, 8);
         when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
                 new OccurrenceResponseDto(1L, 101L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(20, 40), LocalTime.of(22, 55), null, null, null),
+                        LocalTime.of(20, 40), LocalTime.of(22, 55), null, null, null, null, null),
                 new OccurrenceResponseDto(2L, 100L, monday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(10, 25), LocalTime.of(11, 55), null, null, null),
+                        LocalTime.of(10, 25), LocalTime.of(11, 55), null, null, null, null, null),
                 new OccurrenceResponseDto(3L, 102L, tuesday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null),
+                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null, null, null),
                 new OccurrenceResponseDto(4L, 103L, tuesday, OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null)));
+                        LocalTime.of(18, 0), LocalTime.of(20, 0), null, null, null, null, null)));
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(10, 25), 90),
                 recurring(101L, DayOfWeek.MONDAY, LocalTime.of(20, 40), 135),

@@ -11,7 +11,7 @@ post {
 }
 
 docs {
-  POST /v1/room-requests/items/{id}/notify. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
+  POST /v1/room-requests/items/{id}/notify. Rol: ADMINISTRADOR, AUXILIAR_AULICO.
 
   Manda al docente la propuesta de aulas y deja el pedido en `NOTIFIED`. Calcula
   `acceptanceDeadline`: el menor entre `roomRequests.acceptance.businessHours` horas

@@ -69,7 +69,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
                 30, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
         Long eventId;
         SecurityContextHolder.getContext().setAuthentication(
-                new TestingAuthenticationToken(USER, "", "ROLE_SUBSECRETARIA"));
+                new TestingAuthenticationToken(USER, "", "ROLE_ADMINISTRADOR"));
         try {
             eventId = academicEventService.createRecurringEvent(dto).id();
         } finally {

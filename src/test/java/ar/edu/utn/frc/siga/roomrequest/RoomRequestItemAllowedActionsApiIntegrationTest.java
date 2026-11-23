@@ -63,7 +63,7 @@ class RoomRequestItemAllowedActionsApiIntegrationTest extends AbstractIntegratio
     }
 
     @Test
-    @DisplayName("GET /items como SUBSECRETARIA con un ítem derivado: [RETURN, CANCEL] por fila")
+    @DisplayName("GET /items como ADMINISTRADOR con un ítem derivado: [RETURN, CANCEL] por fila")
     void listAsSubsecretariaOnDerivedItem() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         derivedItem(academic, testData.edificio());
@@ -77,7 +77,7 @@ class RoomRequestItemAllowedActionsApiIntegrationTest extends AbstractIntegratio
     }
 
     @Test
-    @DisplayName("GET /items/{id} como SUBSECRETARIA con un ítem NEW: [ASSIGN, DERIVE, CANCEL]")
+    @DisplayName("GET /items/{id} como ADMINISTRADOR con un ítem NEW: [ASSIGN, DERIVE, CANCEL]")
     void detailAsSubsecretariaOnNewItem() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());

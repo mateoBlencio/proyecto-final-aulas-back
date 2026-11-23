@@ -57,12 +57,12 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void setUpAuthenticatedMockMvc() {
-        mockMvc = mockMvcAs(FIXTURE_EMAIL, SystemRole.SUBSECRETARIA);
+        mockMvc = mockMvcAs(FIXTURE_EMAIL, SystemRole.ADMINISTRADOR);
     }
 
     /**
      * Corre {@code action} con el {@link SecurityContextHolder} poblado por el usuario fixture
-     * (SUBSECRETARIA / GLOBAL). Para los tests de integración que invocan servicios acotados por
+     * (ADMINISTRADOR / GLOBAL). Para los tests de integración que invocan servicios acotados por
      * edificio directamente (no vía {@code mockMvc}), donde no hay filtro que establezca el contexto.
      */
     protected <T> T asFixtureUser(Supplier<T> action) {

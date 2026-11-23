@@ -3,11 +3,11 @@ SELECT 'admin.test@frc.utn.edu.ar', '$2y$10$o7WlgInnrDPs6RaXEE.P8.u5kv/Z.q6MxDmf
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'admin.test@frc.utn.edu.ar');
 
 INSERT INTO usuario_rol (id_usuario, rol, tipo_alcance, id_alcance)
-SELECT u.id_usuario, 'SUBSECRETARIA', 'GLOBAL', NULL
+SELECT u.id_usuario, 'ADMINISTRADOR', 'GLOBAL', NULL
 FROM usuario u
 WHERE u.correo = 'admin.test@frc.utn.edu.ar'
   AND NOT EXISTS (
-      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'SUBSECRETARIA'
+      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'ADMINISTRADOR'
   );
 
 INSERT INTO edificio (nombre)

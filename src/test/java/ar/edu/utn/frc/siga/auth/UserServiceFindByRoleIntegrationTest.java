@@ -59,20 +59,20 @@ class UserServiceFindByRoleIntegrationTest extends AbstractIntegrationTest {
         createUser(inFirst, true, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, first.getId());
         createUser(inSecond, true, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, second.getId());
         createUser(disabled, false, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, first.getId());
-        createUser(subsecretaria, true, SystemRole.SUBSECRETARIA, ScopeType.GLOBAL, null);
+        createUser(subsecretaria, true, SystemRole.ADMINISTRADOR, ScopeType.GLOBAL, null);
 
         assertThat(emailsWithRole(SystemRole.AUXILIAR_AULICO)).contains(inFirst, inSecond)
                 .doesNotContain(disabled, subsecretaria);
-        assertThat(emailsWithRole(SystemRole.SUBSECRETARIA)).contains(subsecretaria).doesNotContain(inFirst);
+        assertThat(emailsWithRole(SystemRole.ADMINISTRADOR)).contains(subsecretaria).doesNotContain(inFirst);
     }
 
     @Test
-    @DisplayName("un usuario deshabilitado con rol de Subsecretaría no aparece")
+    @DisplayName("un usuario deshabilitado con rol Administrador no aparece")
     void disabledSubsecretariaIsExcluded() {
         String disabled = uniqueEmail("sub-deshabilitada");
-        createUser(disabled, false, SystemRole.SUBSECRETARIA, ScopeType.GLOBAL, null);
+        createUser(disabled, false, SystemRole.ADMINISTRADOR, ScopeType.GLOBAL, null);
 
-        assertThat(emailsWithRole(SystemRole.SUBSECRETARIA)).doesNotContain(disabled);
+        assertThat(emailsWithRole(SystemRole.ADMINISTRADOR)).doesNotContain(disabled);
     }
 
     @Test

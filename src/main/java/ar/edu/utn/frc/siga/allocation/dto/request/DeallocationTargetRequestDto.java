@@ -6,12 +6,14 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Positive;
 
 public record DeallocationTargetRequestDto(
         List<Long> occurrenceIds,
         Long eventId,
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate from,
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate to
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate to,
+        @Positive Integer roomSlot
 ) {
     @AssertTrue(message = "Debe indicar occurrenceIds o eventId, pero no ambos ni ninguno")
     private boolean isTargetValid() {
@@ -28,5 +30,10 @@ public record DeallocationTargetRequestDto(
             return false;
         }
         return to == null || from != null;
+    }
+
+    @AssertTrue(message = "'roomSlot' solo aplica junto a eventId")
+    private boolean isRoomSlotValid() {
+        return roomSlot == null || eventId != null;
     }
 }
