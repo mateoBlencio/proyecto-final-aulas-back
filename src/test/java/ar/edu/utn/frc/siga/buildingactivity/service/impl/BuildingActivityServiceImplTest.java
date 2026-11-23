@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.buildingactivity.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.audit.AuditUserNames;
 import ar.edu.utn.frc.siga.buildingactivity.dto.response.BuildingActivityDto;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivitySeen;
@@ -73,6 +74,8 @@ class BuildingActivityServiceImplTest {
     private BuildingActivitySeenRepository seenRepository;
     @Mock
     private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private AuditUserNames userNames;
 
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
@@ -81,7 +84,7 @@ class BuildingActivityServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new BuildingActivityServiceImpl(repository, seenRepository, buildingScopeResolver, objectMapper);
+        service = new BuildingActivityServiceImpl(repository, seenRepository, buildingScopeResolver, objectMapper, userNames);
     }
 
     @Test
@@ -183,6 +186,23 @@ class BuildingActivityServiceImplTest {
             assertThat(line.fromClassroom()).isNull();
             assertThat(line.toClassroom().roomNumber()).isEqualTo(101);
         });
+    }
+
+    @Test
+    @DisplayName("find: actorFullName sale de AuditUserNames y es null si el actor no se resuelve")
+    void findResolvesActorFullNameOrNull() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(activity(1L, "ana@utn.edu.ar"), activity(2L, "sistema"))));
+        when(userNames.fullNames(Set.of("ana@utn.edu.ar", "sistema")))
+                .thenReturn(java.util.Map.of("ana@utn.edu.ar", "Ana Lopez"));
+
+        List<BuildingActivityDto> content = service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20)).getContent();
+
+        assertThat(content).extracting(BuildingActivityDto::actor, BuildingActivityDto::actorFullName)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("ana@utn.edu.ar", "Ana Lopez"),
+                        org.assertj.core.groups.Tuple.tuple("sistema", null));
     }
 
     @Test
