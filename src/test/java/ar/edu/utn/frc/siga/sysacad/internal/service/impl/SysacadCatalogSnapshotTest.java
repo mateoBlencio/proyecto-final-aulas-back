@@ -246,7 +246,99 @@ class SysacadCatalogSnapshotTest {
                 List.of(scheduleWithCourse("..."), scheduleWithCourse(null), scheduleWithCourse("5D1."))
         ).findSubjectCommissions();
 
-        assertThat(result).containsExactly(new SysacadSubjectCommissionDto("5D1", 17, 94, 519, 30));
+        assertThat(result).containsExactly(new SysacadSubjectCommissionDto("5D1", 17, 94, 519, 30, 0));
+    }
+
+    private static RawSchedule commissionRow(String curso, Integer materia, String comisionDictado,
+            Integer horarioCuatrimestre) {
+        return new RawSchedule(
+                curso, 90, 805, 15, "Edif. Ing.Possetto",
+                2, horarioCuatrimestre, comisionDictado, "A",
+                "10:30", "12:45", "10:30-12:45", 135,
+                17, "Ingeniería en Sistemas de Información", 94, materia, "Sistemas de Representación", 30);
+    }
+
+    private List<Integer> semesters(RawSchedule... rows) {
+        return snapshot(List.of(), List.of(rows)).findSubjectCommissions().stream()
+                .map(SysacadSubjectCommissionDto::semester).toList();
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: ComisionDictado 'A' da 0, '1' da 1 y '2' da 2, sin mirar HorarioCuatrimestre")
+    void findSubjectCommissionsSemesterFromComisionDictado() {
+        assertThat(semesters(commissionRow("5D1", 519, "A", 2))).containsExactly(0);
+        assertThat(semesters(commissionRow("5D1", 519, "1", 2))).containsExactly(1);
+        assertThat(semesters(commissionRow("5D1", 519, "2", 1))).containsExactly(2);
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: ComisionDictado con espacios alrededor se interpreta igual")
+    void findSubjectCommissionsSemesterTrimsComisionDictado() {
+        assertThat(semesters(commissionRow("5D1", 519, " 1 ", 2))).containsExactly(1);
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: sin ComisionDictado, un 0 en cualquier fila da anual aunque haya 1 o 2")
+    void findSubjectCommissionsZeroWinsOverSemesters() {
+        assertThat(semesters(commissionRow("5D1", 519, null, 1), commissionRow("5D1", 519, null, 0),
+                commissionRow("5D1", 519, null, 2))).containsExactly(0, 0, 0);
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: sin ComisionDictado ni 0, un único cuatrimestre da ese valor y dos distintos dan null")
+    void findSubjectCommissionsFallsBackToHorarioCuatrimestre() {
+        assertThat(semesters(commissionRow("5D1", 519, "", 2), commissionRow("5D1", 519, "", 2)))
+                .containsExactly(2, 2);
+        assertThat(semesters(commissionRow("5D1", 519, null, 1), commissionRow("5D1", 519, null, 2)))
+                .containsExactly(null, null);
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: 'C' toma el único cuatrimestre distinto de 0; con ambos da null")
+    void findSubjectCommissionsCuatrimestralCode() {
+        assertThat(semesters(commissionRow("5D1", 519, "C", 0), commissionRow("5D1", 519, "C", 1)))
+                .containsExactly(1, 1);
+        assertThat(semesters(commissionRow("5D1", 519, "C", 1), commissionRow("5D1", 519, "C", 2)))
+                .containsExactly(null, null);
+        assertThat(semesters(commissionRow("5D1", 519, "C", 0))).containsExactly((Integer) null);
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: ComisionDictado distintos en la misma pareja dan null y loguean WARN")
+    void findSubjectCommissionsConflictingComisionDictado() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogSnapshot.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        List<Integer> result;
+        try {
+            result = semesters(commissionRow("5D1", 519, "1", 1), commissionRow("5D1", 519, "2", 2));
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(result).containsExactly(null, null);
+        assertThat(appender.list).anyMatch(event -> event.getFormattedMessage().contains("ComisionDictado en conflicto")
+                && event.getFormattedMessage().contains("curso=5D1")
+                && event.getFormattedMessage().contains("materia=519"));
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: cada pareja curso+materia se resuelve por separado")
+    void findSubjectCommissionsResolvesPerPair() {
+        assertThat(semesters(
+                commissionRow("5D1", 519, "1", 1),
+                commissionRow("5D1", 520, "2", 2),
+                commissionRow("5D2", 519, "A", 0))).containsExactly(1, 2, 0);
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: los códigos de curso que normalizan igual comparten pareja")
+    void findSubjectCommissionsPairUsesNormalizedCourse() {
+        assertThat(semesters(commissionRow("5D1.", 519, "A", 0), commissionRow("5D1", 519, "A", 1)))
+                .containsExactly(0, 0);
+        assertThat(semesters(commissionRow("5D1.", 519, null, 1), commissionRow("5D1", 519, null, 2)))
+                .containsExactly(null, null);
     }
 
     @Test

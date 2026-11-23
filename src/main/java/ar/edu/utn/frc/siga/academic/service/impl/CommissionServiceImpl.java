@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -280,6 +281,7 @@ public class CommissionServiceImpl implements CommissionService {
                     .subject(subject)
                     .commission(commission)
                     .enrolledCount(enrolledCount)
+                    .semester(command.semester())
                     .build();
             subjectCommissionRepository.save(created);
             // Registrar el link recién creado para que un duplicado (mismo subject+commission) en el
@@ -287,14 +289,17 @@ public class CommissionServiceImpl implements CommissionService {
             existingLinks.put(id, created);
             return 1;
         }
+        boolean semesterChanged = !Objects.equals(command.semester(), link.getSemester());
+        link.setSemester(command.semester());
+        boolean countChanged = false;
         if (command.enrolledCount() == null) {
             log.info("Inscriptos no informados para curso={}, materia={}: se conserva el valor existente ({})",
                     command.courseCode(), command.subjectCode(), link.getEnrolledCount());
-            return 0;
+        } else {
+            countChanged = !command.enrolledCount().equals(link.getEnrolledCount());
+            link.setEnrolledCount(command.enrolledCount());
         }
-        boolean countChanged = !command.enrolledCount().equals(link.getEnrolledCount());
-        link.setEnrolledCount(command.enrolledCount());
-        if (!countChanged) {
+        if (!countChanged && !semesterChanged) {
             return 0;
         }
         subjectCommissionRepository.save(link);
