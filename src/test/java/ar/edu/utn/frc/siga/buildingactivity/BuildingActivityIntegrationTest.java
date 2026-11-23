@@ -442,6 +442,27 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.page.totalElements").value(1));
     }
 
+    @Test
+    @DisplayName("actorFullName trae nombre y apellido del usuario y es null si el actor no existe; actor no cambia")
+    void exposesActorFullName() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliary = auxiliaryOf(building);
+        String known = "known-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
+        mockMvcAs(known, SystemRole.ADMINISTRADOR);
+        String unknown = "ghost-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
+        seedActivity(building, "A", known, AllocationSource.MANUAL, "2026-10-10T10:00:00Z", 1);
+        seedActivity(building, "B", unknown, AllocationSource.MANUAL, "2026-10-10T11:00:00Z", 1);
+
+        String body = auxiliary.perform(get("/v1/building-activity").param("sort", "occurredAt,asc"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        JsonNode content = objectMapper.readTree(body).get("content");
+        assertThat(content.get(0).get("actor").asText()).isEqualTo(known);
+        assertThat(content.get(0).get("actorFullName").asText()).isEqualTo("Fixture User");
+        assertThat(content.get(1).get("actor").asText()).isEqualTo(unknown);
+        assertThat(content.get(1).get("actorFullName").isNull()).isTrue();
+    }
+
     private long seedActivity(Building building, String name, String actor, AllocationSource source, String occurredAt,
                               int lineCount) {
         String lines = "[" + String.join(",", java.util.Collections.nCopies(lineCount, "{\"occurrenceId\":1}")) + "]";
