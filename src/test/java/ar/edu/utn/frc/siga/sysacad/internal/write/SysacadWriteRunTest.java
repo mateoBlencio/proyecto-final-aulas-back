@@ -477,13 +477,14 @@ class SysacadWriteRunTest {
     void notSendableRecordsReason() {
         SysacadSchedule schedule = schedule(1);
         planReturns(new PlannedSchedule(schedule,
-                new NotSendable(1001L, CLASS_DATE, DestinationNotSendableReason.CLASSROOM_NOT_FOUND)));
+                new NotSendable(1001L, CLASS_DATE, DestinationNotSendableReason.CLASSROOM_NOT_FOUND, List.of())));
 
         run.run(NOW);
 
         verify(scheduleWriter).recordEvent(1L, ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, 1001L, null,
                 DestinationNotSendableReason.CLASSROOM_NOT_FOUND.name());
-        verifyNoInteractions(sendCycle);
+        verifyNoInteractions(sendCycle, commissionMessageSender);
+        verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
     }
 
     @Test
@@ -700,7 +701,8 @@ class SysacadWriteRunTest {
         run.run(NOW);
 
         InOrder order = inOrder(commissionMessageSender, scheduleWriter);
-        order.verify(commissionMessageSender).sendRoomsUpdate(eq(schedule), eq(notify), any());
+        order.verify(commissionMessageSender).sendRoomsUpdate(eq(schedule), eq(notify.occurrenceId()), eq(notify.date()), eq(notify.rooms()),
+                any());
         order.verify(scheduleWriter).recordAnnouncedRooms(1L, "5-228,5-229");
         verifyNoInteractions(sendCycle);
     }
@@ -727,7 +729,7 @@ class SysacadWriteRunTest {
         verify(scheduleWriter).recordEvent(1L, ScheduleLogType.SANDBOX_MESSAGE, 5, 228, 1001L, null,
                 "5-228,5-229");
         verify(commissionMessageSender).logSandboxPreview(any(), any(), any());
-        verify(commissionMessageSender, never()).sendRoomsUpdate(any(), any(), any());
+        verify(commissionMessageSender, never()).sendRoomsUpdate(any(), any(), any(), any(), any());
         verifyNoInteractions(sendCycle);
         verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
     }
@@ -742,6 +744,75 @@ class SysacadWriteRunTest {
 
         verifyNoInteractions(commissionMessageSender, sendCycle);
         verify(scheduleWriter, never()).recordEvent(anyLong(), any(), any(), any(), any(), any(), any());
+        verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
+    }
+
+    private static NotSendable disabledDecision(long id, List<RoomRef> rooms) {
+        return new NotSendable(1000 + id, CLASS_DATE, DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD,
+                rooms);
+    }
+
+    private static final List<RoomRef> DISABLED_ROOMS = List.of(new RoomRef(5, 230), new RoomRef(5, 231));
+
+    @Test
+    @DisplayName("NotSendable deshabilitada en ON: deja el evento, manda el aviso y guarda el conjunto, sin ciclo de envío")
+    void disabledNotSendableOnRecordsEventAndAnnounces() {
+        SysacadSchedule schedule = schedule(1);
+        planReturns(new PlannedSchedule(schedule, disabledDecision(1, DISABLED_ROOMS)));
+
+        run.run(NOW);
+
+        InOrder order = inOrder(scheduleWriter, commissionMessageSender);
+        order.verify(scheduleWriter).recordEvent(1L, ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, 1001L,
+                null, DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD.name());
+        order.verify(commissionMessageSender).sendRoomsUpdate(eq(schedule), eq(1001L), eq(CLASS_DATE),
+                eq(DISABLED_ROOMS), any());
+        order.verify(scheduleWriter).recordAnnouncedRooms(1L, "5-230,5-231");
+        verifyNoInteractions(sendCycle);
+        verify(scheduleWriter, never()).recordEvent(anyLong(), eq(ScheduleLogType.SEND_INTENT), any(), any(), any(),
+                any(), any());
+    }
+
+    @Test
+    @DisplayName("NotSendable deshabilitada en SANDBOX: deja el evento y SANDBOX_MESSAGE, y no manda ni guarda el conjunto")
+    void disabledNotSendableSandboxRecordsPreview() {
+        configure(SysacadWriteMode.SANDBOX, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+        planReturns(new PlannedSchedule(schedule(1), disabledDecision(1, DISABLED_ROOMS)));
+
+        run.run(NOW);
+
+        verify(scheduleWriter).recordEvent(1L, ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, 1001L, null,
+                DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD.name());
+        verify(scheduleWriter).recordEvent(1L, ScheduleLogType.SANDBOX_MESSAGE, 5, 230, 1001L, null,
+                "5-230,5-231");
+        verify(commissionMessageSender).logSandboxPreview(any(), eq(CLASS_DATE), eq(DISABLED_ROOMS));
+        verify(commissionMessageSender, never()).sendRoomsUpdate(any(), any(), any(), any(), any());
+        verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
+        verifyNoInteractions(sendCycle);
+    }
+
+    @Test
+    @DisplayName("NotSendable deshabilitada en OFF: no manda ni guarda nada")
+    void disabledNotSendableOffDoesNothing() {
+        configure(SysacadWriteMode.OFF, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+        planReturns(new PlannedSchedule(schedule(1), disabledDecision(1, DISABLED_ROOMS)));
+
+        run.run(NOW);
+
+        verifyNoInteractions(commissionMessageSender, sendCycle);
+        verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("NotSendable deshabilitada con lista vacía en ON: solo deja el evento, sin mensaje ni conjunto")
+    void disabledNotSendableWithoutRoomsOnlyRecordsEvent() {
+        planReturns(new PlannedSchedule(schedule(1), disabledDecision(1, List.of())));
+
+        run.run(NOW);
+
+        verify(scheduleWriter).recordEvent(1L, ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, 1001L, null,
+                DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD.name());
+        verifyNoInteractions(commissionMessageSender, sendCycle);
         verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
     }
 }

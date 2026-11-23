@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -107,8 +108,11 @@ class SysacadAlertServiceTest {
                 .reason(reason.name()).occurredAt(RUN_END).build();
     }
 
+    private static final List<ScheduleLogType> MESSAGE_TYPES = List.of(ScheduleLogType.COMMISSION_MESSAGE);
+
     private void newsInWindow(SysacadScheduleLogEntry... entries) {
-        when(logRepository.findBetween(any(), eq(PREVIOUS_END), eq(RUN_END))).thenReturn(List.of(entries));
+        when(logRepository.findBetween(argThat(types -> !MESSAGE_TYPES.equals(types)), eq(PREVIOUS_END),
+                eq(RUN_END))).thenReturn(List.of(entries));
         SysacadSchedule schedule = SysacadSchedule.builder().id(1L).courseCode("1K1").subject(115).dayOfWeek(1)
                 .build();
         when(scheduleRepository.findAllById(any())).thenReturn(List.of(schedule));
@@ -180,7 +184,8 @@ class SysacadAlertServiceTest {
     @DisplayName("novedades sin usuarios de Subsecretaría: no manda mail")
     void newsWithoutRecipientsSendsNothing() {
         finishedRun();
-        when(logRepository.findBetween(any(), eq(PREVIOUS_END), eq(RUN_END))).thenReturn(List.of(reviewEntry(1L)));
+        when(logRepository.findBetween(argThat(types -> !MESSAGE_TYPES.equals(types)), eq(PREVIOUS_END),
+                eq(RUN_END))).thenReturn(List.of(reviewEntry(1L)));
         subsecretaria();
 
         service.alert(PREVIOUS_END);
@@ -421,5 +426,74 @@ class SysacadAlertServiceTest {
             assertThat(InformalRegister.find((String) request.model().get("asunto"))).isEmpty();
             assertThat(InformalRegister.find((String) request.model().get("resumen"))).isEmpty();
         }
+    }
+
+    private void messagesInWindow(SysacadScheduleLogEntry... messages) {
+        when(logRepository.findBetween(eq(MESSAGE_TYPES), eq(PREVIOUS_END), eq(RUN_END)))
+                .thenReturn(List.of(messages));
+    }
+
+    private static SysacadScheduleLogEntry messageEntry(long scheduleId, long occurrenceId, String result) {
+        return SysacadScheduleLogEntry.builder().scheduleId(scheduleId).type(ScheduleLogType.COMMISSION_MESSAGE)
+                .occurrenceId(occurrenceId).result(result).occurredAt(RUN_END).build();
+    }
+
+    private List<String> alertWithDisabledNewsAnd(SysacadScheduleLogEntry... messages) {
+        finishedRun();
+        newsInWindow(notSendableEntry(1L, DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD));
+        messagesInWindow(messages);
+        slot77();
+        subsecretaria("sub@utn.edu.ar");
+
+        service.alert(PREVIOUS_END);
+
+        return sentLines();
+    }
+
+    @Test
+    @DisplayName("deshabilitada con mensaje SENT de la misma clase: la línea termina avisando a los alumnos por autogestión")
+    void disabledWithSentMessageSaysStudentsWereNotified() {
+        assertThat(alertWithDisabledNewsAnd(messageEntry(1L, 77L, "SENT"))).singleElement().asString()
+                .contains("está inhabilitada en SysAcad").endsWith("; se avisó a los alumnos por autogestión");
+    }
+
+    @Test
+    @DisplayName("deshabilitada con mensaje FAILED: la línea no dice que se avisó")
+    void disabledWithFailedMessageDoesNotSayNotified() {
+        assertThat(alertWithDisabledNewsAnd(messageEntry(1L, 77L, "FAILED"))).singleElement().asString()
+                .doesNotContain("autogestión");
+    }
+
+    @Test
+    @DisplayName("deshabilitada con mensaje SENT de otra ocurrencia u otro horario: la línea no dice que se avisó")
+    void disabledWithMessageOfAnotherClassDoesNotSayNotified() {
+        assertThat(alertWithDisabledNewsAnd(messageEntry(1L, 78L, "SENT"), messageEntry(2L, 77L, "SENT")))
+                .singleElement().asString().doesNotContain("autogestión");
+    }
+
+    @Test
+    @DisplayName("otro motivo de destino no enviable con mensaje SENT de la misma clase: la línea no dice que se avisó")
+    void otherReasonWithSentMessageDoesNotSayNotified() {
+        finishedRun();
+        newsInWindow(notSendableEntry(1L, DestinationNotSendableReason.CLASSROOM_WITHOUT_NUMBER));
+        messagesInWindow(messageEntry(1L, 77L, "SENT"));
+        slot77();
+        subsecretaria("sub@utn.edu.ar");
+
+        service.alert(PREVIOUS_END);
+
+        assertThat(sentLines()).singleElement().asString().doesNotContain("autogestión");
+    }
+
+    @Test
+    @DisplayName("sin novedades no consulta los mensajes de comisión")
+    void noNewsDoesNotQueryMessages() {
+        finishedRun();
+        when(logRepository.findBetween(argThat(types -> !MESSAGE_TYPES.equals(types)), any(), any()))
+                .thenReturn(List.of());
+
+        service.alert(PREVIOUS_END);
+
+        verify(logRepository, never()).findBetween(eq(MESSAGE_TYPES), any(), any());
     }
 }

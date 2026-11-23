@@ -352,28 +352,29 @@ class NextClassCalculatorTest {
     static Stream<Arguments> invalidDestinations() {
         return Stream.of(
                 Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, true, true, false),
-                        DestinationNotSendableReason.BUILDING_NOT_IN_SYSACAD),
+                        DestinationNotSendableReason.BUILDING_NOT_IN_SYSACAD, List.of()),
                 Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, false, true, true),
-                        DestinationNotSendableReason.CLASSROOM_NOT_IN_SYSACAD),
+                        DestinationNotSendableReason.CLASSROOM_NOT_IN_SYSACAD, List.of()),
                 Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, true, false, true),
-                        DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD),
+                        DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD, roomRefs(229)),
                 Arguments.of(new ClassroomSysacadRefDto(229L, null, BUILDING, true, true, true),
-                        DestinationNotSendableReason.CLASSROOM_WITHOUT_NUMBER),
+                        DestinationNotSendableReason.CLASSROOM_WITHOUT_NUMBER, List.of()),
                 Arguments.of(new ClassroomSysacadRefDto(229L, 229, null, true, true, true),
-                        DestinationNotSendableReason.BUILDING_WITHOUT_CODE),
+                        DestinationNotSendableReason.BUILDING_WITHOUT_CODE, List.of()),
                 Arguments.of(new ClassroomSysacadRefDto(229L, 999, BUILDING, true, true, true),
-                        DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER),
+                        DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER, List.of()),
                 Arguments.of(new ClassroomSysacadRefDto(229L, 0, BUILDING, true, true, true),
-                        DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER),
+                        DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER, List.of()),
                 Arguments.of(new ClassroomSysacadRefDto(229L, -1, BUILDING, true, true, true),
-                        DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER),
-                Arguments.of(null, DestinationNotSendableReason.CLASSROOM_NOT_FOUND));
+                        DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER, List.of()),
+                Arguments.of(null, DestinationNotSendableReason.CLASSROOM_NOT_FOUND, List.of()));
     }
 
     @ParameterizedTest(name = "[{index}] {1}")
     @MethodSource("invalidDestinations")
-    @DisplayName("Un destino no enviable da NotSendable con su motivo")
-    void invalidDestinationIsNotSendable(ClassroomSysacadRefDto destination, DestinationNotSendableReason reason) {
+    @DisplayName("Un destino no enviable da NotSendable con su motivo y solo avisa si está deshabilitada")
+    void invalidDestinationIsNotSendable(ClassroomSysacadRefDto destination, DestinationNotSendableReason reason,
+            List<RoomRef> toAnnounce) {
         Map<Long, ClassroomSysacadRefDto> refs = new HashMap<>();
         if (destination != null) {
             refs.put(229L, destination);
@@ -382,7 +383,7 @@ class NextClassCalculatorTest {
         NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(229L), Map.of(),
                 refs, Map.of(), Set.of(), D1.atTime(7, 0));
 
-        assertThat(decision).isEqualTo(new NotSendable(1L, D1, reason));
+        assertThat(decision).isEqualTo(new NotSendable(1L, D1, reason, toAnnounce));
     }
 
     @Test
@@ -443,7 +444,7 @@ class NextClassCalculatorTest {
         assertThat(calc(known(228), List.of(slot(1, D1)), Map.of(), inProgress)).isEqualTo(new NoRoom(1L, D1));
         assertThat(NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L), Map.of(),
                 Map.of(500L, new ClassroomSysacadRefDto(500L, 0, BUILDING, true, true, true)), Map.of(), Set.of(), inProgress))
-                .isEqualTo(new NotSendable(1L, D1, DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER));
+                .isEqualTo(new NotSendable(1L, D1, DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER, List.of()));
     }
 
     @Test
@@ -474,6 +475,11 @@ class NextClassCalculatorTest {
             Map<Long, List<Long>> mirrors, LocalDateTime now) {
         return calc(schedule, List.of(slot(1, D1), mirror(11, 1, D1)), classrooms, mirrors,
                 refs(227, 228, 229, 230), now);
+    }
+
+    private static NextClassDecision calcWithMirrors(SysacadSchedule schedule, Map<Long, Long> classrooms,
+            Map<Long, List<Long>> mirrors, LocalDateTime now, Map<Long, ClassroomSysacadRefDto> refs) {
+        return calc(schedule, List.of(slot(1, D1), mirror(11, 1, D1)), classrooms, mirrors, refs, now);
     }
 
     @Test
@@ -587,5 +593,127 @@ class NextClassCalculatorTest {
                 refs(228, 229), D1.atTime(7, 0));
 
         assertThat(decision).isEqualTo(new Send(BUILDING, 999, 1L, D1, START, END, roomRefs(999)));
+    }
+
+    private static ClassroomSysacadRefDto disabledRef(long id, Integer room, Integer building) {
+        return new ClassroomSysacadRefDto(id, room, building, true, false, true);
+    }
+
+    private static Map<Long, ClassroomSysacadRefDto> refsWithDisabled(ClassroomSysacadRefDto disabled) {
+        Map<Long, ClassroomSysacadRefDto> refs = refs(227, 228, 229, 230);
+        refs.put(disabled.classroomId(), disabled);
+        return refs;
+    }
+
+    private static NotSendable disabled(List<RoomRef> toAnnounce) {
+        return new NotSendable(1L, D1, DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD, toAnnounce);
+    }
+
+    @Test
+    @DisplayName("Principal deshabilitada distinta de la conocida: NotSendable que lleva el aviso con esa aula")
+    void disabledPrincipalAnnouncesItself() {
+        NextClassDecision decision = calc(known(228), List.of(slot(1, D1)), Map.of(1L, 229L), Map.of(),
+                refsWithDisabled(disabledRef(229, 229, BUILDING)), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(disabled(roomRefs(229)));
+    }
+
+    @Test
+    @DisplayName("Principal deshabilitada con espejo: el aviso lleva la principal primero y el espejo")
+    void disabledPrincipalAnnouncesMirrors() {
+        NextClassDecision decision = calcWithMirrors(known(228), Map.of(1L, 229L), Map.of(1L, List.of(230L)),
+                D1.atTime(7, 0), refsWithDisabled(disabledRef(229, 229, BUILDING)));
+
+        assertThat(decision).isEqualTo(disabled(roomRefs(229, 230)));
+    }
+
+    @Test
+    @DisplayName("Principal deshabilitada con el conjunto ya avisado: sin aviso, incluso reordenado")
+    void disabledPrincipalAlreadyAnnouncedDoesNotRepeat() {
+        Map<Long, ClassroomSysacadRefDto> refs = refsWithDisabled(disabledRef(229, 229, BUILDING));
+
+        assertThat(calc(announced(228, "1-229"), List.of(slot(1, D1)), Map.of(1L, 229L), Map.of(), refs,
+                D1.atTime(7, 0))).isEqualTo(disabled(List.of()));
+        assertThat(calcWithMirrors(announced(228, "1-229,1-230"), Map.of(1L, 229L), Map.of(1L, List.of(230L)),
+                D1.atTime(7, 0), refs)).isEqualTo(disabled(List.of()));
+    }
+
+    @Test
+    @DisplayName("Principal deshabilitada, ya avisada y con espejo nuevo: el conjunto cambió y se avisa de nuevo")
+    void disabledPrincipalWithNewMirrorAnnouncesAgain() {
+        NextClassDecision decision = calcWithMirrors(announced(228, "1-229"), Map.of(1L, 229L),
+                Map.of(1L, List.of(230L)), D1.atTime(7, 0), refsWithDisabled(disabledRef(229, 229, BUILDING)));
+
+        assertThat(decision).isEqualTo(disabled(roomRefs(229, 230)));
+    }
+
+    @Test
+    @DisplayName("Principal deshabilitada con la clase ya empezada: sin aviso, y un segundo antes sí")
+    void disabledPrincipalDoesNotAnnounceOnceClassStarted() {
+        Map<Long, ClassroomSysacadRefDto> refs = refsWithDisabled(disabledRef(229, 229, BUILDING));
+        List<OccurrenceSlotDto> slots = List.of(slot(1, D1));
+
+        assertThat(calc(known(228), slots, Map.of(1L, 229L), Map.of(), refs, D1.atTime(START)))
+                .isEqualTo(disabled(List.of()));
+        assertThat(calc(known(228), slots, Map.of(1L, 229L), Map.of(), refs, D1.atTime(START).minusSeconds(1)))
+                .isEqualTo(disabled(roomRefs(229)));
+    }
+
+    @Test
+    @DisplayName("Con un pedido pendiente la clase da Waiting aunque la principal esté deshabilitada")
+    void disabledPrincipalWithPendingRequestWaits() {
+        Map<Long, OccurrenceRequestStateDto> pending =
+                Map.of(1L, new OccurrenceRequestStateDto(1L, 77L, OccurrenceRequestState.PENDING));
+
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), Map.of(1L, 229L),
+                Map.of(), refsWithDisabled(disabledRef(229, 229, BUILDING)), pending, Set.of(), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Waiting(1L, 77L, D1, START));
+    }
+
+    static Stream<Arguments> disabledWithoutValidDestination() {
+        return Stream.of(
+                Arguments.of("sin número", disabledRef(229, null, BUILDING)),
+                Arguments.of("número 0", disabledRef(229, 0, BUILDING)),
+                Arguments.of("número negativo", disabledRef(229, -1, BUILDING)),
+                Arguments.of("número 999", disabledRef(229, 999, BUILDING)),
+                Arguments.of("sin código de edificio", disabledRef(229, 229, null)));
+    }
+
+    @ParameterizedTest(name = "[{index}] deshabilitada {0}")
+    @MethodSource("disabledWithoutValidDestination")
+    @DisplayName("Deshabilitada pero con número o edificio inválido: mantiene el motivo y no avisa")
+    void disabledWithoutValidDestinationDoesNotAnnounce(String description, ClassroomSysacadRefDto ref) {
+        NextClassDecision decision = calc(known(228), List.of(slot(1, D1)), Map.of(1L, 229L), Map.of(),
+                refsWithDisabled(ref), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(disabled(List.of()));
+    }
+
+    @Test
+    @DisplayName("Deshabilitada igual a la conocida y sin espejos ni aviso previo: sin aviso")
+    void disabledEqualToKnownWithoutMirrorsDoesNotAnnounce() {
+        NextClassDecision decision = calc(known(229), List.of(slot(1, D1)), Map.of(1L, 229L), Map.of(),
+                refsWithDisabled(disabledRef(229, 229, BUILDING)), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(disabled(List.of()));
+    }
+
+    @Test
+    @DisplayName("Deshabilitada igual a la conocida pero con espejo nuevo: avisa el conjunto")
+    void disabledEqualToKnownWithMirrorAnnounces() {
+        NextClassDecision decision = calcWithMirrors(known(229), Map.of(1L, 229L), Map.of(1L, List.of(230L)),
+                D1.atTime(7, 0), refsWithDisabled(disabledRef(229, 229, BUILDING)));
+
+        assertThat(decision).isEqualTo(disabled(roomRefs(229, 230)));
+    }
+
+    @Test
+    @DisplayName("Tras avisar una deshabilitada, la vuelta al aula conocida habilitada da NotifyOnly con esa aula")
+    void returnToKnownRoomAfterDisabledAnnouncementNotifiesOnly() {
+        NextClassDecision decision = calc(announced(228, "1-229"), List.of(slot(1, D1)), Map.of(1L, 228L), Map.of(),
+                refs(227, 228, 229, 230), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new NotifyOnly(1L, D1, roomRefs(228)));
     }
 }
