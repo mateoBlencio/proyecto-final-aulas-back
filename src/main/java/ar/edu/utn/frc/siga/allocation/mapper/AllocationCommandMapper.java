@@ -36,21 +36,22 @@ public class AllocationCommandMapper {
 
     private AllocationItem toItem(AllocationItemRequestDto dto) {
         return new AllocationItem(
-                toTarget(dto.occurrenceIds(), dto.eventId(), dto.from(), dto.to()), dto.classroomId());
+                toTarget(dto.occurrenceIds(), dto.eventId(), dto.from(), dto.to(), null), dto.classroomId());
     }
 
     private AllocationTarget toTarget(DeallocationTargetRequestDto dto) {
-        return toTarget(dto.occurrenceIds(), dto.eventId(), dto.from(), dto.to());
+        return toTarget(dto.occurrenceIds(), dto.eventId(), dto.from(), dto.to(), dto.roomSlot());
     }
 
     // Las combinaciones inválidas (rango sin evento, `to` sin `from`) no llegan hasta acá: las
     // corta Bean Validation en los DTOs de request con un 400.
-    private AllocationTarget toTarget(List<Long> occurrenceIds, Long eventId, LocalDate from, LocalDate to) {
+    private AllocationTarget toTarget(List<Long> occurrenceIds, Long eventId, LocalDate from, LocalDate to,
+            Integer roomSlot) {
         if (eventId == null) {
             return new AllocationTarget.Occurrences(occurrenceIds);
         }
         return from == null
-                ? new AllocationTarget.Event(eventId)
-                : new AllocationTarget.EventRange(eventId, from, to);
+                ? new AllocationTarget.Event(eventId, roomSlot)
+                : new AllocationTarget.EventRange(eventId, from, to, roomSlot);
     }
 }

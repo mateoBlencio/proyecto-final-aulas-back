@@ -2,6 +2,9 @@ package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.allocation.MirrorScenarioBuilder.Scenario;
+import ar.edu.utn.frc.siga.allocation.MirrorScenarioBuilder.WeekDay;
+import ar.edu.utn.frc.siga.allocation.MirrorScenarioBuilder.WeeklyScenario;
+import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
@@ -21,9 +24,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -195,5 +201,152 @@ class AllocationReleaseMirrorScopeIntegrationTest extends AbstractIntegrationTes
 
         assertReleasedAs(s.principalId(), ReleaseReason.VIRTUAL_CLASS, s.principalRoom().getId());
         assertReleasedAs(s.mirrorId(), ReleaseReason.VIRTUAL_CLASS, s.mirrorRoom().getId());
+    }
+
+    private WeeklyScenario weekly(int weeks) throws Exception {
+        Classroom principalRoom = testData.aula(testData.edificio());
+        List<Classroom> mirrorRooms = new java.util.ArrayList<>();
+        for (int i = 0; i < weeks; i++) {
+            mirrorRooms.add(testData.aula(testData.edificio()));
+        }
+        return scenarios.buildWeekly(nextDate(), principalRoom, mirrorRooms);
+    }
+
+    private ResultActions releaseEvent(Long eventId, LocalDate from, Integer roomSlot, String mirrorScope)
+            throws Exception {
+        String slot = roomSlot == null ? "" : ",\"roomSlot\":" + roomSlot;
+        return mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"items\":[{\"eventId\":" + eventId + ",\"from\":\"" + from + "\"" + slot
+                        + "}],\"reason\":\"VIRTUAL_CLASS\",\"mirrorScope\":\"" + mirrorScope + "\"}"));
+    }
+
+    private ResultActions cancelReleaseEvent(Long eventId, LocalDate from, Integer roomSlot) throws Exception {
+        String slot = roomSlot == null ? "" : ",\"roomSlot\":" + roomSlot;
+        return mockMvc.perform(delete("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"items\":[{\"eventId\":" + eventId + ",\"from\":\"" + from + "\"" + slot + "}]}"));
+    }
+
+    @Test
+    @DisplayName("rango con roomSlot=2 y ONLY_SELECTED: solo los espejos quedan liberados y las principales siguen en su aula")
+    void rangeWithRoomSlot2ReleasesOnlyMirrors() throws Exception {
+        WeeklyScenario s = weekly(3);
+
+        releaseEvent(s.eventId(), s.days().getFirst().date(), 2, "ONLY_SELECTED").andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        for (WeekDay day : s.days()) {
+            assertReleasedAs(day.mirrorId(), ReleaseReason.VIRTUAL_CLASS, day.mirrorRoom().getId());
+            assertStillAssigned(day.principalId(), s.principalRoom().getId());
+        }
+    }
+
+    @Test
+    @DisplayName("rango con roomSlot=1 y ONLY_SELECTED: cada principal pasa al aula de su espejo y responde movedToClassroomId")
+    void rangeWithRoomSlot1ConsolidatesEveryDate() throws Exception {
+        WeeklyScenario s = weekly(3);
+
+        var result = releaseEvent(s.eventId(), s.days().getFirst().date(), 1, "ONLY_SELECTED")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
+        for (WeekDay day : s.days()) {
+            result.andExpect(jsonPath("$[?(@.occurrenceId==" + day.principalId() + ")].movedToClassroomId")
+                    .value(day.mirrorRoom().getId().intValue()));
+        }
+
+        for (WeekDay day : s.days()) {
+            assertStillAssigned(day.principalId(), day.mirrorRoom().getId());
+            assertReleasedAs(day.mirrorId(), ReleaseReason.MIRROR_RETIRED, day.mirrorRoom().getId());
+        }
+    }
+
+    @Test
+    @DisplayName("rango con roomSlot=1 y una fecha cuyo espejo no tiene aula disponible: 409 con esa fecha y nada cambia en ninguna fecha")
+    void rangeWithBlockedDateRespondsConflictAndChangesNothing() throws Exception {
+        WeeklyScenario s = weekly(3);
+        WeekDay blocked = s.days().get(1);
+        classroomRepository.softDelete(classroomRepository.findById(blocked.mirrorRoom().getId()).orElseThrow());
+
+        releaseEvent(s.eventId(), s.days().getFirst().date(), 1, "ONLY_SELECTED").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.dates.length()").value(1))
+                .andExpect(jsonPath("$.dates[0]").value(blocked.date().toString()));
+
+        for (WeekDay day : s.days()) {
+            assertStillAssigned(day.principalId(), s.principalRoom().getId());
+            assertStillAssigned(day.mirrorId(), day.mirrorRoom().getId());
+        }
+    }
+
+    @Test
+    @DisplayName("rango sin roomSlot y ALL: libera principales y espejos de todas las fechas (regresión)")
+    void rangeWithoutRoomSlotAllReleasesEverything() throws Exception {
+        WeeklyScenario s = weekly(2);
+
+        releaseEvent(s.eventId(), s.days().getFirst().date(), null, "ALL").andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4));
+
+        for (WeekDay day : s.days()) {
+            assertReleasedAs(day.principalId(), ReleaseReason.VIRTUAL_CLASS, s.principalRoom().getId());
+            assertReleasedAs(day.mirrorId(), ReleaseReason.VIRTUAL_CLASS, day.mirrorRoom().getId());
+        }
+    }
+
+    @Test
+    @DisplayName("roomSlot junto a occurrenceIds o con valor 0 responde 400")
+    void invalidRoomSlotRespondsBadRequest() throws Exception {
+        Scenario s = scenarios.build(nextDate(), 40);
+
+        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + s.principalId() + "],\"roomSlot\":2}],"
+                                + "\"reason\":\"VIRTUAL_CLASS\"}"))
+                .andExpect(status().isBadRequest());
+        releaseEvent(s.eventId(), s.date(), 0, "ALL").andExpect(status().isBadRequest());
+
+        assertStillAssigned(s.principalId(), s.principalRoom().getId());
+        assertStillAssigned(s.mirrorId(), s.mirrorRoom().getId());
+    }
+
+    @Test
+    @DisplayName("GET de la asignación expone roomSlot y mirrorOfOccurrenceId: espejo con 2 y la id de la principal, principal con 1 y null")
+    void allocationDetailExposesRoomSlotAndMirrorOf() throws Exception {
+        Scenario s = scenarios.build(nextDate(), 40);
+        Long mirrorAllocationId = allocationRepository.findByOccurrenceId(s.mirrorId()).orElseThrow().getId();
+        Long principalAllocationId = allocationRepository.findByOccurrenceId(s.principalId()).orElseThrow().getId();
+
+        mockMvc.perform(get("/v1/allocations/{id}", mirrorAllocationId)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.occurrence.id").value(s.mirrorId().intValue()))
+                .andExpect(jsonPath("$.occurrence.roomSlot").value(2))
+                .andExpect(jsonPath("$.occurrence.mirrorOfOccurrenceId").value(s.principalId().intValue()));
+        mockMvc.perform(get("/v1/allocations/{id}", principalAllocationId)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.occurrence.roomSlot").value(1))
+                .andExpect(jsonPath("$.occurrence.mirrorOfOccurrenceId").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("revertir con roomSlot=2 después de liberar todo: solo vuelven a NEEDS_ROOM los espejos, las principales siguen liberadas")
+    void cancelReleaseWithRoomSlot2RevertsOnlyMirrors() throws Exception {
+        WeeklyScenario s = weekly(2);
+        releaseEvent(s.eventId(), s.days().getFirst().date(), null, "ALL").andExpect(status().isOk());
+
+        cancelReleaseEvent(s.eventId(), s.days().getFirst().date(), 2).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        for (WeekDay day : s.days()) {
+            assertThat(occurrence(day.mirrorId()).getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+            assertThat(occurrence(day.principalId()).getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        }
+    }
+
+    @Test
+    @DisplayName("revertir con roomSlot=1 arrastra a los espejos liberados de la principal (cancelRelease agrega espejos con withActiveMirrors)")
+    void cancelReleaseWithRoomSlot1AlsoRevertsMirrors() throws Exception {
+        WeeklyScenario s = weekly(2);
+        releaseEvent(s.eventId(), s.days().getFirst().date(), null, "ALL").andExpect(status().isOk());
+
+        cancelReleaseEvent(s.eventId(), s.days().getFirst().date(), 1).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4));
+
+        for (WeekDay day : s.days()) {
+            assertThat(occurrence(day.mirrorId()).getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+            assertThat(occurrence(day.principalId()).getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+        }
     }
 }

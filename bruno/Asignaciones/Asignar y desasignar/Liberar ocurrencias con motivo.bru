@@ -15,11 +15,12 @@ body:json {
     "items": [
       { "occurrenceIds": [1041, 1042] },
       { "eventId": 55 },
-      { "eventId": 56, "from": "2026-04-07", "to": "2026-06-30" }
+      { "eventId": 56, "from": "2026-04-07", "to": "2026-06-30" },
+      { "eventId": 57, "from": "2026-04-07", "roomSlot": 2 }
     ],
     "reason": "VIRTUAL_CLASS",
     "note": "Cursado virtual hasta fin de cuatrimestre",
-    "mirrorScope": "ALL"
+    "mirrorScope": "ONLY_SELECTED"
   }
 }
 
@@ -32,6 +33,11 @@ docs {
   una principal seleccionada pasa al aula de uno de ellos (el de mayor capacidad), que queda
   MIRROR_RETIRED, y vuelve con movedToClassroomId. Un espejo seleccionado solo se libera él.
   409 si el espejo no tiene aula disponible (propiedad dates): reenviar con ALL.
+
+  roomSlot (opcional, entero positivo, solo junto a eventId; con occurrenceIds da 400): limita el item
+  a una sola aula de la clase por su orden (1 principal, 2+ espejos). Con rango o cursada completa
+  permite "solo esta aula" (mirrorScope ONLY_SELECTED). Es el lugar de la clase, no el número de aula.
+  Los espejos se identifican con roomSlot y mirrorOfOccurrenceId en GET /v1/allocations/{id}.
 
   Respuesta 200: [ { occurrenceId, eventId, date, freedClassroomId, reason, movedToClassroomId } ].
   400 motivo faltante, MIRROR_RETIRED o CLASSROOM_DEACTIVATED (motivos internos, errors.reasonSelectable) u OTHER sin nota; 403 sin alcance sobre el edificio; 409 ocurrencia pasada.
