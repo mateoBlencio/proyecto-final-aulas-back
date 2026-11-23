@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.notification.internal.service;
 
+import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.notification.internal.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -37,5 +38,15 @@ class NotificationRetryClaimer {
             repository.postponeNextAttempt(claimed, now.plus(CLAIM_LOCK_DURATION));
         }
         return claimed;
+    }
+
+    @Transactional
+    void discardExpiredSensitive() {
+        Instant now = Instant.now();
+        for (NotificationTemplate template : NotificationTemplate.values()) {
+            if (template.expiresAfter() != null) {
+                repository.discardExpiredPending(template.name(), now.minus(template.expiresAfter()));
+            }
+        }
     }
 }

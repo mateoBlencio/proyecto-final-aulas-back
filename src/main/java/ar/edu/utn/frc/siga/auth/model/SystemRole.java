@@ -9,7 +9,7 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public enum SystemRole {
 
-    SUBSECRETARIA(EnumSet.allOf(Permission.class)),
+    ADMINISTRADOR(EnumSet.allOf(Permission.class)),
 
     AUXILIAR_AULICO(EnumSet.of(
             Permission.BUILDING_READ,
@@ -60,7 +60,7 @@ public enum SystemRole {
 
     public boolean allowsScope(ScopeType scopeType) {
         return switch (this) {
-            case SUBSECRETARIA -> scopeType == ScopeType.GLOBAL;
+            case ADMINISTRADOR -> scopeType == ScopeType.GLOBAL;
             case AUXILIAR_AULICO -> scopeType == ScopeType.BUILDING;
             case CONSULTA -> true;
         };

@@ -47,6 +47,8 @@ cors:
   allowed-origins: http://localhost:5173,http://127.0.0.1:5173
 
 siga:
+  password-reset:
+    frontend-base-url: http://localhost:5173
   jwt:
     # Random per run unless JWT_SECRET is set (tokens do not survive restarts); no secret is versioned
     secret: ${JWT_SECRET:${random.uuid}${random.uuid}}

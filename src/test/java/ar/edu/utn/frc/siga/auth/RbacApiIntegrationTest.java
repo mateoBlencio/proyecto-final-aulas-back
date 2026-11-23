@@ -6,12 +6,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.auth.dto.request.AssignRoleRequestDto;
+import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
+import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RoleAssignmentRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
+import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -24,6 +29,15 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import tools.jackson.databind.ObjectMapper;
 
 @Import(IntegrationTestData.class)
@@ -38,6 +52,10 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     private RoleAssignmentRepository roleAssignmentRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RoleAssignmentService roleAssignmentService;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -163,7 +181,7 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("DELETE role-assignments propia: 400, no se puede auto-revocar")
     void revoke_ownAssignment_returns400() throws Exception {
         String email = uniqueEmail("self");
-        MockMvc selfMockMvc = mockMvcAsScoped(email, SystemRole.SUBSECRETARIA, ScopeType.GLOBAL, null);
+        MockMvc selfMockMvc = mockMvcAsScoped(email, SystemRole.ADMINISTRADOR, ScopeType.GLOBAL, null);
         Long userId = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();
         Long assignmentId = roleAssignmentRepository.findAllByUserId(userId).getFirst().getId();
 
@@ -228,7 +246,7 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST role-assignments: SUBSECRETARIA con BUILDING o AUXILIAR_AULICO con GLOBAL: 400 y no se guarda nada")
+    @DisplayName("POST role-assignments: ADMINISTRADOR con BUILDING o AUXILIAR_AULICO con GLOBAL: 400 y no se guarda nada")
     void assign_roleWithDisallowedScope_returnsBadRequestAndPersistsNothing() throws Exception {
         Building building = testData.edificio();
         Long subsecretariaUserId = createPlainUser(uniqueEmail("subsec-building"));
@@ -236,7 +254,7 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", subsecretariaUserId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody("SUBSECRETARIA", ScopeType.BUILDING, building.getId())))
+                        .content(assignRoleBody("ADMINISTRADOR", ScopeType.BUILDING, building.getId())))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/v1/users/{id}/role-assignments", auxiliarUserId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -245,6 +263,71 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(roleAssignmentRepository.findAllByUserId(subsecretariaUserId)).isEmpty();
         assertThat(roleAssignmentRepository.findAllByUserId(auxiliarUserId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("POST role-assignments: ADMINISTRADOR a un auxiliar: 422 y no persiste la fila")
+    void assign_administradorToAuxiliar_returns422AndPersistsNothing() throws Exception {
+        Building building = testData.edificio();
+        String email = uniqueEmail("aux-to-admin");
+        mockMvcAsScoped(email, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
+        Long userId = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();
+
+        mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignRoleBody("ADMINISTRADOR", ScopeType.GLOBAL, null)))
+                .andExpect(status().isUnprocessableEntity());
+
+        assertThat(roleAssignmentRepository.findAllByUserId(userId))
+                .extracting(RoleAssignment::getRole)
+                .containsExactly(SystemRole.AUXILIAR_AULICO);
+    }
+
+    @Test
+    @DisplayName("assign toma el lock del usuario: espera el commit de quien ya lo tiene")
+    void assign_waitsForUserRowLockHeldByAnotherTransaction() throws Exception {
+        Long userId = createPlainUser(uniqueEmail("lock"));
+        CountDownLatch holdingLock = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+
+        Callable<Void> holder = () -> {
+            txTemplate.executeWithoutResult(status -> {
+                userRepository.findByIdForUpdate(userId).orElseThrow();
+                holdingLock.countDown();
+                awaitLatch(release);
+            });
+            return null;
+        };
+        Callable<RoleAssignmentDto> assigner = () -> asFixtureUser(() -> roleAssignmentService.assign(
+                userId, new AssignRoleRequestDto(SystemRole.CONSULTA, ScopeType.GLOBAL, null), "admin@frc.utn.edu.ar"));
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Void> futureHolder = pool.submit(holder);
+            awaitLatch(holdingLock);
+            Future<RoleAssignmentDto> futureAssign = pool.submit(assigner);
+
+            assertThatThrownBy(() -> futureAssign.get(500, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            release.countDown();
+            futureHolder.get(30, TimeUnit.SECONDS);
+
+            assertThat(futureAssign.get(30, TimeUnit.SECONDS).roleName()).isEqualTo("CONSULTA");
+        }
+
+        assertThat(roleAssignmentRepository.findAllByUserId(userId)).hasSize(1);
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timeout esperando el latch");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 
     // ---- listado por rol y edificio ----

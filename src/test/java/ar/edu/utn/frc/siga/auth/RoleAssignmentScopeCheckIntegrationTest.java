@@ -50,7 +50,7 @@ class RoleAssignmentScopeCheckIntegrationTest extends AbstractIntegrationTest {
                 "Edificio-Check-" + System.nanoTime());
 
         assertThatThrownBy(() -> jdbc.update(
-                "insert into usuario_rol (id_usuario, rol, tipo_alcance, id_alcance) values (?, 'SUBSECRETARIA', 'BUILDING', ?)",
+                "insert into usuario_rol (id_usuario, rol, tipo_alcance, id_alcance) values (?, 'ADMINISTRADOR', 'BUILDING', ?)",
                 userId, buildingId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }

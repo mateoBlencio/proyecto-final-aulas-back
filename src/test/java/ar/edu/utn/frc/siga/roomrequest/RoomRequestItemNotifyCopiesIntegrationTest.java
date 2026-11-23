@@ -46,9 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("POST /v1/room-requests/items/{id}/notify: CC y CCO del mail (integración)")
 class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest {
 
-    private static final String SUBSECRETARIA = "subsecretaria@frc.utn.edu.ar";
-    /** Usuario SUBSECRETARIA GLOBAL que AbstractIntegrationTest autentica en cada test. */
-    private static final String SUBSECRETARIA_FIXTURE = "integration-test@frc.utn.edu.ar";
+    private static final String ADMINISTRADOR = "subsecretaria@frc.utn.edu.ar";
+    private static final String ADMINISTRADOR_FIXTURE = "integration-test@frc.utn.edu.ar";
 
     @Autowired
     private IntegrationTestData testData;
@@ -72,8 +71,8 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
         String auxiliar = "auxiliar-copias-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
         MockMvc auxiliarMvc = mockMvcAsScoped(auxiliar, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING,
                 building.getId());
-        String otraSubsecretaria = enabledSubsecretaria();
-        String subsecretariaDeshabilitada = disabledSubsecretaria();
+        String otroAdministrador = enabledAdministrador();
+        String administradorDeshabilitado = disabledAdministrador();
         RoomRequestItem item = seedInEvaluation(building);
 
         auxiliarMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
@@ -83,8 +82,8 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
         Map<String, Object> row = notificationRow(item.getId());
         assertThat(row.get("cc")).isEqualTo(auxiliar);
         assertThat(addresses(row.get("cco")))
-                .contains(SUBSECRETARIA_FIXTURE, otraSubsecretaria)
-                .doesNotContain(auxiliar, subsecretariaDeshabilitada, "ada@frc.utn.edu.ar")
+                .contains(ADMINISTRADOR_FIXTURE, otroAdministrador)
+                .doesNotContain(auxiliar, administradorDeshabilitado, "ada@frc.utn.edu.ar")
                 .doesNotHaveDuplicates();
         assertThat(addresses(row.get("responder_a"))).contains(auxiliar);
         assertThat(row.get("destinatario")).isEqualTo("ada@frc.utn.edu.ar");
@@ -92,8 +91,8 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
 
     @Test
     @DisplayName("notifica una subsecretaria: CC = ella, CCO = las demás subsecretarias sin repetirla")
-    void notifyComoSubsecretaria_ccoSinElActor() throws Exception {
-        String otraSubsecretaria = enabledSubsecretaria();
+    void notifyComoAdministrador_ccoSinElActor() throws Exception {
+        String otroAdministrador = enabledAdministrador();
         RoomRequestItem item = seedInEvaluation(null);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
@@ -101,10 +100,10 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
                 .andExpect(jsonPath("$.status").value("NOTIFIED"));
 
         Map<String, Object> row = notificationRow(item.getId());
-        assertThat(row.get("cc")).isEqualTo(SUBSECRETARIA_FIXTURE);
+        assertThat(row.get("cc")).isEqualTo(ADMINISTRADOR_FIXTURE);
         assertThat(addresses(row.get("cco")))
-                .contains(otraSubsecretaria)
-                .doesNotContain(SUBSECRETARIA_FIXTURE)
+                .contains(otroAdministrador)
+                .doesNotContain(ADMINISTRADOR_FIXTURE)
                 .doesNotHaveDuplicates();
     }
 
@@ -119,13 +118,13 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
     }
 
     /** Crea una subsecretaria habilitada vía el helper de MockMvc y devuelve su email. */
-    private String enabledSubsecretaria() {
+    private String enabledAdministrador() {
         String email = "subsecretaria-extra-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
-        mockMvcAs(email, SystemRole.SUBSECRETARIA);
+        mockMvcAs(email, SystemRole.ADMINISTRADOR);
         return email;
     }
 
-    private String disabledSubsecretaria() {
+    private String disabledAdministrador() {
         String email = "subsecretaria-baja-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
         User user = userRepository.save(User.builder()
                 .email(email)
@@ -135,7 +134,7 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
                 .lastName("Subsecretaria")
                 .build());
         roleAssignmentRepository.save(RoleAssignment.builder()
-                .user(user).role(SystemRole.SUBSECRETARIA).scopeType(ScopeType.GLOBAL).scopeId(null).build());
+                .user(user).role(SystemRole.ADMINISTRADOR).scopeType(ScopeType.GLOBAL).scopeId(null).build());
         return email;
     }
 
@@ -168,9 +167,9 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
         request.addItem(item);
         Instant now = Instant.now();
         if (building != null) {
-            item.deriveTo(building.getId(), SUBSECRETARIA, now);
+            item.deriveTo(building.getId(), ADMINISTRADOR, now);
         }
-        item.decide(RoomRequestStatus.IN_EVALUATION, SUBSECRETARIA, "motivo de prueba", now);
+        item.decide(RoomRequestStatus.IN_EVALUATION, ADMINISTRADOR, "motivo de prueba", now);
         roomRequestRepository.save(request);
         return item;
     }

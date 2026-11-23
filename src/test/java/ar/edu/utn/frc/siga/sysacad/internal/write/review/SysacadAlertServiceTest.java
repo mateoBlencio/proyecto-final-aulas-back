@@ -94,7 +94,7 @@ class SysacadAlertServiceTest {
     }
 
     private void subsecretaria(String... emails) {
-        when(userService.findByRole(SystemRole.SUBSECRETARIA))
+        when(userService.findByRole(SystemRole.ADMINISTRADOR))
                 .thenReturn(java.util.Arrays.stream(emails).map(SysacadAlertServiceTest::user).toList());
     }
 

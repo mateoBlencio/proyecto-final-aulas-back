@@ -6,6 +6,8 @@ public interface RefreshTokenService {
 
     IssuedRefreshToken issue(User user);
 
+    IssuedRefreshToken issueForLogin(User user, String authenticatedPasswordHash);
+
     RefreshResult refresh(String rawToken);
 
     void revoke(String rawToken);

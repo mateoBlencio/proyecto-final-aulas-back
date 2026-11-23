@@ -73,7 +73,7 @@ class FieldLabelsTest {
     @DisplayName("textos concretos: VIRTUAL_CLASS es 'Clase virtual' y los roles salen en español")
     void constant_knownTexts() {
         assertThat(AuditLabels.constant(ReleaseReason.VIRTUAL_CLASS)).isEqualTo("Clase virtual");
-        assertThat(AuditLabels.constant(SystemRole.SUBSECRETARIA)).isEqualTo("Subsecretaría");
+        assertThat(AuditLabels.constant(SystemRole.ADMINISTRADOR)).isEqualTo("Administrador");
         assertThat(AuditLabels.constant(SystemRole.AUXILIAR_AULICO)).isEqualTo("Auxiliar áulico");
         assertThat(AuditLabels.constant(SystemRole.CONSULTA)).isEqualTo("Consulta");
         assertThat(AuditLabels.constant(DayOfWeek.MONDAY)).isEqualTo("Lunes");

@@ -76,7 +76,7 @@ class CameraCountApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("SUBSECRETARIA: con el conteo deshabilitado, POST y GET /health responden 503")
+    @DisplayName("ADMINISTRADOR: con el conteo deshabilitado, POST y GET /health responden 503")
     void subsecretariaGetsDisabled() throws Exception {
         mockMvc.perform(postCount(VALID_BODY))
                 .andExpect(status().isServiceUnavailable())

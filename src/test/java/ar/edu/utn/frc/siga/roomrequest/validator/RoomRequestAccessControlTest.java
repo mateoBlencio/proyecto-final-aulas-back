@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("RoomRequestAccessControl")
 class RoomRequestAccessControlTest {
 
-    private static final String SUBSECRETARIA_EMAIL = "subsecretaria@frc.utn.edu.ar";
+    private static final String ADMINISTRADOR_EMAIL = "subsecretaria@frc.utn.edu.ar";
     private static final String AUXILIAR_EMAIL = "auxiliar@frc.utn.edu.ar";
     private static final Long SU_BUILDING = 1L;
     private static final Long OTRO_BUILDING = 2L;
@@ -41,12 +41,12 @@ class RoomRequestAccessControlTest {
     private RoomRequestAccessControl accessControl;
 
     private void asSubsecretaria() {
-        lenient().when(userService.hasRole(SUBSECRETARIA_EMAIL, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        lenient().when(userService.hasRole(ADMINISTRADOR_EMAIL, SystemRole.ADMINISTRADOR)).thenReturn(true);
         accessControl = new RoomRequestAccessControl(userService);
     }
 
     private void asAuxiliar(Long... buildingIds) {
-        lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.ADMINISTRADOR)).thenReturn(false);
         lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
         lenient().when(userService.findBuildingIdsForRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO))
                 .thenReturn(Set.of(buildingIds));
@@ -58,18 +58,18 @@ class RoomRequestAccessControlTest {
         asAuxiliar();
     }
 
-    /** Usuario con SUBSECRETARIA y además auxiliar del edificio indicado. */
+    /** Usuario con ADMINISTRADOR y además auxiliar del edificio indicado. */
     private void asSubsecretariaYAuxiliar(Long... buildingIds) {
-        lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.ADMINISTRADOR)).thenReturn(true);
         lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
         lenient().when(userService.findBuildingIdsForRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO))
                 .thenReturn(Set.of(buildingIds));
         accessControl = new RoomRequestAccessControl(userService);
     }
 
-    /** Un rol sin AUXILIAR_AULICO ni SUBSECRETARIA (p. ej. CONSULTA): no debería recortarse como auxiliar. */
+    /** Un rol sin AUXILIAR_AULICO ni ADMINISTRADOR (p. ej. CONSULTA): no debería recortarse como auxiliar. */
     private void asOtroRol(String email) {
-        lenient().when(userService.hasRole(email, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        lenient().when(userService.hasRole(email, SystemRole.ADMINISTRADOR)).thenReturn(false);
         lenient().when(userService.hasRole(email, SystemRole.AUXILIAR_AULICO)).thenReturn(false);
         accessControl = new RoomRequestAccessControl(userService);
     }
@@ -86,8 +86,8 @@ class RoomRequestAccessControlTest {
         asSubsecretaria();
         RoomRequestItem item = item(RoomRequestStatus.NEW, null);
 
-        assertAllowed(item, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.DERIVE, Action.CANCEL);
-        assertForbidden(item, SUBSECRETARIA_EMAIL, Action.RETURN, Action.NOTIFY);
+        assertAllowed(item, ADMINISTRADOR_EMAIL, Action.ASSIGN, Action.DERIVE, Action.CANCEL);
+        assertForbidden(item, ADMINISTRADOR_EMAIL, Action.RETURN, Action.NOTIFY);
     }
 
     @Test
@@ -96,8 +96,8 @@ class RoomRequestAccessControlTest {
         asSubsecretaria();
         RoomRequestItem item = item(RoomRequestStatus.DERIVED_TO_BUILDING, SU_BUILDING);
 
-        assertAllowed(item, SUBSECRETARIA_EMAIL, Action.RETURN, Action.CANCEL);
-        assertForbidden(item, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.DERIVE, Action.NOTIFY);
+        assertAllowed(item, ADMINISTRADOR_EMAIL, Action.RETURN, Action.CANCEL);
+        assertForbidden(item, ADMINISTRADOR_EMAIL, Action.ASSIGN, Action.DERIVE, Action.NOTIFY);
     }
 
     @Test
@@ -108,17 +108,17 @@ class RoomRequestAccessControlTest {
         RoomRequestItem sinEdificio = item(RoomRequestStatus.IN_EVALUATION, null);
         RoomRequestItem conEdificio = item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING);
 
-        assertAllowed(sinEdificio, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.NOTIFY, Action.CANCEL);
-        assertForbidden(conEdificio, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.NOTIFY);
-        assertAllowed(conEdificio, SUBSECRETARIA_EMAIL, Action.CANCEL);
+        assertAllowed(sinEdificio, ADMINISTRADOR_EMAIL, Action.ASSIGN, Action.NOTIFY, Action.CANCEL);
+        assertForbidden(conEdificio, ADMINISTRADOR_EMAIL, Action.ASSIGN, Action.NOTIFY);
+        assertAllowed(conEdificio, ADMINISTRADOR_EMAIL, Action.CANCEL);
     }
 
     @Test
     @DisplayName("subsecretaría en CANCELLED, con o sin edificio: nada, ni retomar")
     void subsecretariaEnCancelado() {
         asSubsecretaria();
-        assertForbidden(item(RoomRequestStatus.CANCELLED, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.values());
-        assertForbidden(item(RoomRequestStatus.CANCELLED, null), SUBSECRETARIA_EMAIL, Action.values());
+        assertForbidden(item(RoomRequestStatus.CANCELLED, SU_BUILDING), ADMINISTRADOR_EMAIL, Action.values());
+        assertForbidden(item(RoomRequestStatus.CANCELLED, null), ADMINISTRADOR_EMAIL, Action.values());
     }
 
     @Test
@@ -127,8 +127,8 @@ class RoomRequestAccessControlTest {
         asSubsecretaria();
         for (RoomRequestStatus status : Set.of(RoomRequestStatus.NOTIFIED, RoomRequestStatus.RESOLVED)) {
             RoomRequestItem derivado = item(status, SU_BUILDING);
-            assertAllowed(derivado, SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
-            assertForbidden(derivado, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.DERIVE, Action.RETURN, Action.CANCEL,
+            assertAllowed(derivado, ADMINISTRADOR_EMAIL, Action.TAKE_OVER);
+            assertForbidden(derivado, ADMINISTRADOR_EMAIL, Action.ASSIGN, Action.DERIVE, Action.RETURN, Action.CANCEL,
                     Action.NOTIFY, Action.CONFIRM, Action.REOPEN);
         }
     }
@@ -138,7 +138,7 @@ class RoomRequestAccessControlTest {
     void takeOverSinEdificioNoSePermite() {
         asSubsecretaria();
         for (RoomRequestStatus status : RoomRequestStatus.values()) {
-            assertForbidden(item(status, null), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+            assertForbidden(item(status, null), ADMINISTRADOR_EMAIL, Action.TAKE_OVER);
         }
     }
 
@@ -146,9 +146,9 @@ class RoomRequestAccessControlTest {
     @DisplayName("TAKE_OVER en IN_EVALUATION derivado: la subsecretaría retoma; en DERIVED_TO_BUILDING y NEW no (se usa return)")
     void takeOverSegunEstado() {
         asSubsecretaria();
-        assertAllowed(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
-        assertForbidden(item(RoomRequestStatus.DERIVED_TO_BUILDING, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
-        assertForbidden(item(RoomRequestStatus.NEW, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+        assertAllowed(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), ADMINISTRADOR_EMAIL, Action.TAKE_OVER);
+        assertForbidden(item(RoomRequestStatus.DERIVED_TO_BUILDING, SU_BUILDING), ADMINISTRADOR_EMAIL, Action.TAKE_OVER);
+        assertForbidden(item(RoomRequestStatus.NEW, SU_BUILDING), ADMINISTRADOR_EMAIL, Action.TAKE_OVER);
     }
 
     @Test
@@ -168,8 +168,8 @@ class RoomRequestAccessControlTest {
         asSubsecretaria();
         RoomRequestItem item = item(RoomRequestStatus.NOTIFIED, null);
 
-        assertAllowed(item, SUBSECRETARIA_EMAIL, Action.CANCEL, Action.CONFIRM, Action.REOPEN);
-        assertForbidden(item, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.NOTIFY, Action.DERIVE, Action.RETURN);
+        assertAllowed(item, ADMINISTRADOR_EMAIL, Action.CANCEL, Action.CONFIRM, Action.REOPEN);
+        assertForbidden(item, ADMINISTRADOR_EMAIL, Action.ASSIGN, Action.NOTIFY, Action.DERIVE, Action.RETURN);
     }
 
     @Test
@@ -178,8 +178,8 @@ class RoomRequestAccessControlTest {
         asSubsecretaria();
         RoomRequestItem item = item(RoomRequestStatus.RESOLVED, null);
 
-        assertAllowed(item, SUBSECRETARIA_EMAIL, Action.REOPEN);
-        assertForbidden(item, SUBSECRETARIA_EMAIL, Action.CANCEL, Action.CONFIRM, Action.ASSIGN, Action.NOTIFY);
+        assertAllowed(item, ADMINISTRADOR_EMAIL, Action.REOPEN);
+        assertForbidden(item, ADMINISTRADOR_EMAIL, Action.CANCEL, Action.CONFIRM, Action.ASSIGN, Action.NOTIFY);
     }
 
     @Test
@@ -216,7 +216,7 @@ class RoomRequestAccessControlTest {
     @DisplayName("allowedActions no ofrece REOPEN en un RESOLVED con fecha pasada, pero authorize sí lo permite")
     void allowedActionsOcultaReopenConFechaPasada() {
         asSubsecretaria();
-        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(ADMINISTRADOR_EMAIL);
         RoomRequestItem past = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
                 .date(java.time.LocalDate.now().minusDays(1)).build();
         RoomRequestItem future = RoomRequestItem.builder().id(2L).status(RoomRequestStatus.RESOLVED)
@@ -226,14 +226,14 @@ class RoomRequestAccessControlTest {
         assertThat(accessControl.allowedActions(past, actor)).isEmpty();
         assertThat(accessControl.allowedActions(future, actor)).containsExactly(Action.REOPEN);
         assertThat(accessControl.allowedActions(regular, actor)).containsExactly(Action.REOPEN);
-        assertAllowed(past, SUBSECRETARIA_EMAIL, Action.REOPEN);
+        assertAllowed(past, ADMINISTRADOR_EMAIL, Action.REOPEN);
     }
 
     @Test
     @DisplayName("allowedActions oculta TAKE_OVER en un RESOLVED derivado con fecha pasada, pero authorize sí lo permite")
     void allowedActionsOcultaTakeOverConFechaPasada() {
         asSubsecretaria();
-        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(ADMINISTRADOR_EMAIL);
         RoomRequestItem past = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
                 .derivedBuildingId(SU_BUILDING).date(java.time.LocalDate.now().minusDays(1)).build();
         RoomRequestItem future = RoomRequestItem.builder().id(2L).status(RoomRequestStatus.RESOLVED)
@@ -244,7 +244,7 @@ class RoomRequestAccessControlTest {
         assertThat(accessControl.allowedActions(past, actor)).isEmpty();
         assertThat(accessControl.allowedActions(future, actor)).containsExactly(Action.TAKE_OVER);
         assertThat(accessControl.allowedActions(notifiedPast, actor)).containsExactly(Action.TAKE_OVER);
-        assertAllowed(past, SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+        assertAllowed(past, ADMINISTRADOR_EMAIL, Action.TAKE_OVER);
     }
 
     // ---------- auxiliar áulico ----------
@@ -316,7 +316,7 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("resolveActor de un usuario con SUBSECRETARIA y auxiliar de un edificio: actor de subsecretaría sin edificios")
+    @DisplayName("resolveActor de un usuario con ADMINISTRADOR y auxiliar de un edificio: actor de subsecretaría sin edificios")
     void resolveActorSubsecretariaGanaSobreAuxiliar() {
         asSubsecretariaYAuxiliar(SU_BUILDING);
 
@@ -348,7 +348,7 @@ class RoomRequestAccessControlTest {
     @DisplayName("readScope de subsecretaría: sin recorte")
     void readScopeSubsecretaria() {
         asSubsecretaria();
-        assertThat(accessControl.readScope(SUBSECRETARIA_EMAIL)).isEmpty();
+        assertThat(accessControl.readScope(ADMINISTRADOR_EMAIL)).isEmpty();
     }
 
     @Test
@@ -373,14 +373,14 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("readScope de un usuario con SUBSECRETARIA y auxiliar de un edificio: sin recorte")
+    @DisplayName("readScope de un usuario con ADMINISTRADOR y auxiliar de un edificio: sin recorte")
     void readScopeSubsecretariaYAuxiliar() {
         asSubsecretariaYAuxiliar(SU_BUILDING);
         assertThat(accessControl.readScope(AUXILIAR_EMAIL)).isEmpty();
     }
 
     @Test
-    @DisplayName("authorizeRead: usuario con SUBSECRETARIA y auxiliar del edificio 1 lee un ítem derivado al 2")
+    @DisplayName("authorizeRead: usuario con ADMINISTRADOR y auxiliar del edificio 1 lee un ítem derivado al 2")
     void authorizeReadSubsecretariaYAuxiliarLeeEdificioAjeno() {
         asSubsecretariaYAuxiliar(SU_BUILDING);
 
@@ -400,7 +400,7 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("readScope de un rol sin AUXILIAR_AULICO ni SUBSECRETARIA (p. ej. CONSULTA): sin recorte")
+    @DisplayName("readScope de un rol sin AUXILIAR_AULICO ni ADMINISTRADOR (p. ej. CONSULTA): sin recorte")
     void readScopeOtroRol() {
         String consultaEmail = "consulta@frc.utn.edu.ar";
         asOtroRol(consultaEmail);
@@ -411,7 +411,7 @@ class RoomRequestAccessControlTest {
     @DisplayName("authorizeRead: subsecretaría lee cualquier pedido")
     void authorizeReadSubsecretaria() {
         asSubsecretaria();
-        assertThatCode(() -> accessControl.authorizeRead(item(RoomRequestStatus.NEW, null), SUBSECRETARIA_EMAIL))
+        assertThatCode(() -> accessControl.authorizeRead(item(RoomRequestStatus.NEW, null), ADMINISTRADOR_EMAIL))
                 .doesNotThrowAnyException();
     }
 
@@ -436,7 +436,7 @@ class RoomRequestAccessControlTest {
     @DisplayName("allowedActions: subsecretaría en NEW devuelve exactamente [ASSIGN, DERIVE, CANCEL]")
     void allowedActionsSubsecretariaEnNew() {
         asSubsecretaria();
-        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(ADMINISTRADOR_EMAIL);
 
         assertThat(accessControl.allowedActions(item(RoomRequestStatus.NEW, null), actor))
                 .containsExactly(Action.ASSIGN, Action.DERIVE, Action.CANCEL);
@@ -446,7 +446,7 @@ class RoomRequestAccessControlTest {
     @DisplayName("allowedActions: subsecretaría en IN_EVALUATION con edificio derivado devuelve [TAKE_OVER, CANCEL]")
     void allowedActionsSubsecretariaEnEvaluacionConEdificio() {
         asSubsecretaria();
-        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(ADMINISTRADOR_EMAIL);
 
         assertThat(accessControl.allowedActions(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), actor))
                 .containsExactly(Action.TAKE_OVER, Action.CANCEL);
@@ -465,7 +465,7 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("allowedActions: un rol sin SUBSECRETARIA ni AUXILIAR_AULICO (CONSULTA) no puede nada")
+    @DisplayName("allowedActions: un rol sin ADMINISTRADOR ni AUXILIAR_AULICO (CONSULTA) no puede nada")
     void allowedActionsOtroRolVacio() {
         String consultaEmail = "consulta@frc.utn.edu.ar";
         asOtroRol(consultaEmail);
@@ -479,7 +479,7 @@ class RoomRequestAccessControlTest {
     void allowedActionsCoincideConAuthorize() {
         String consultaEmail = "consulta@frc.utn.edu.ar";
         Map<String, Runnable> perfiles = new LinkedHashMap<>();
-        perfiles.put(SUBSECRETARIA_EMAIL, this::asSubsecretaria);
+        perfiles.put(ADMINISTRADOR_EMAIL, this::asSubsecretaria);
         perfiles.put(AUXILIAR_EMAIL + "#edificio1", () -> asAuxiliar(SU_BUILDING));
         perfiles.put(AUXILIAR_EMAIL + "#global", this::asAuxiliarGlobal);
         perfiles.put(consultaEmail, () -> asOtroRol(consultaEmail));

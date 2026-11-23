@@ -89,7 +89,7 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
     private RoomRequestRepository roomRequestRepository;
 
     @Test
-    @DisplayName("reasignar como SUBSECRETARIA deja una actividad con su linea, con el jsonb como arreglo de objetos")
+    @DisplayName("reasignar como ADMINISTRADOR deja una actividad con su linea, con el jsonb como arreglo de objetos")
     void reallocateLeavesActivityWithLine() throws Exception {
         Scenario s = scenario();
 
@@ -225,7 +225,7 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
     void redeliveredEventDoesNotDuplicate() throws Exception {
         Scenario s = scenario();
         String actor = "sub-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
-        mockMvcAs(actor, SystemRole.SUBSECRETARIA);
+        mockMvcAs(actor, SystemRole.ADMINISTRADOR);
         ClassroomMovements event = new ClassroomMovements(UUID.randomUUID().toString(), actor, AllocationSource.MANUAL,
                 "reentrega", Instant.now(), List.of(new Change(s.occurrence().getId(), s.eventId(), s.date(), START,
                 START.plusMinutes(DURATION), s.from().getId(), s.to().getId())));

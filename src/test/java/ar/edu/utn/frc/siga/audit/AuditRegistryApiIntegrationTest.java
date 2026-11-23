@@ -1012,7 +1012,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     private long createUser(String email, boolean withRole) throws Exception {
         String role = withRole ? ",\"initialRole\":{\"role\":\"CONSULTA\",\"scopeType\":\"GLOBAL\"}" : "";
         MvcResult result = mockMvc.perform(post("/v1/users").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"supersegura\","
+                        .content("{\"email\":\"" + email + "\",\"password\":\"clave-segura-2026\","
                                 + "\"firstName\":\"Diff\",\"lastName\":\"Test\"" + role + "}"))
                 .andExpect(status().isCreated()).andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();

@@ -32,6 +32,8 @@ class NotificationRendererTest {
     private static final String AULAS_NO_DISPONIBLES =
             "El aula 204 (Edificio Central) que solicitó no está disponible por el momento.";
 
+    private static final String RESET_LINK = "https://siga.frc.utn.edu.ar/restablecer-contrasena#token=abc_DEF-123";
+
     private NotificationRenderer renderer;
 
     @BeforeEach
@@ -317,6 +319,8 @@ class NotificationRendererTest {
             case ROOM_REQUEST_TAKEN_OVER -> takenOverModel();
             case BUILDING_ACTIVITY -> buildingActivityModel();
             case SYSACAD_ALERT -> sysacadModel();
+            case PASSWORD_RESET -> passwordResetModel();
+            case PASSWORD_CHANGED -> passwordChangedModel();
         };
 
         RenderedNotification rendered = renderer.render(template, model);
@@ -325,6 +329,42 @@ class NotificationRendererTest {
         assertThat(visible).contains("Estimado/a");
         assertThat(InformalRegister.find(rendered.subject())).as("asunto: %s", rendered.subject()).isEmpty();
         assertThat(InformalRegister.find(visible)).as("cuerpo de %s", template).isEmpty();
+    }
+
+    @Test
+    void passwordResetBodyContainsTheLinkAndTheExpiry() {
+        RenderedNotification rendered = renderer.render(NotificationTemplate.PASSWORD_RESET, passwordResetModel());
+
+        assertThat(rendered.subject()).isEqualTo("Restablecimiento de contraseña de SIGA");
+        assertThat(rendered.body())
+                .contains("href=\"" + RESET_LINK + "\"")
+                .contains("Estimado/a <span>Ana Gómez</span>:")
+                .contains("vence en <span>30</span> minutos");
+    }
+
+    @Test
+    void passwordChangedBodyShowsNameAndDateTime() {
+        RenderedNotification rendered = renderer.render(NotificationTemplate.PASSWORD_CHANGED, passwordChangedModel());
+
+        assertThat(rendered.subject()).isEqualTo("Su contraseña de SIGA fue modificada");
+        assertThat(rendered.body())
+                .contains("Estimado/a <span>Ana Gómez</span>:")
+                .contains("se modificó el <span>22/11/2026 10:30</span>");
+    }
+
+    private Map<String, Object> passwordResetModel() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("nombre", "Ana Gómez");
+        model.put("enlace", RESET_LINK);
+        model.put("minutosVencimiento", 30);
+        return model;
+    }
+
+    private Map<String, Object> passwordChangedModel() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("nombre", "Ana Gómez");
+        model.put("fechaHora", "22/11/2026 10:30");
+        return model;
     }
 
     private Map<String, Object> sysacadModel() {

@@ -158,7 +158,7 @@ public class SysacadAlertService {
 
     private List<NotificationRecipient> recipients() {
         Map<String, NotificationRecipient> byEmail = new LinkedHashMap<>();
-        for (UserResponseDto user : userService.findByRole(SystemRole.SUBSECRETARIA)) {
+        for (UserResponseDto user : userService.findByRole(SystemRole.ADMINISTRADOR)) {
             byEmail.putIfAbsent(user.email(), new NotificationRecipient(user.firstName() + " " + user.lastName(),
                     user.email()));
         }

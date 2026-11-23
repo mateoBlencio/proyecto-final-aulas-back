@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -24,6 +25,7 @@ import org.assertj.core.data.TemporalUnitWithinOffset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -136,6 +138,54 @@ class NotificationDispatcherTest {
     @Test
     void backoffForTenthAttemptIsCappedAtOneHour() {
         assertThat(NotificationDispatcher.backoffFor(10)).isEqualTo(Duration.ofHours(1));
+    }
+
+    @Test
+    void expiredSensitiveNotificationIsDiscardedWithoutCallingTheChannel() {
+        NotificationDispatcher dispatcher = newDispatcher();
+        Notification notification = sensitive("PASSWORD_RESET", Instant.now().minus(Duration.ofMinutes(31)));
+        when(repository.findById(1L)).thenReturn(Optional.of(notification));
+
+        dispatcher.dispatch(1L);
+
+        verify(channelSender, never()).send(any(), any());
+        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.DISCARDED);
+        assertThat(notification.getBody()).isEqualTo("[contenido omitido]");
+    }
+
+    @Test
+    void unexpiredSensitiveNotificationIsSentAndItsBodyRedacted() {
+        NotificationDispatcher dispatcher = newDispatcher();
+        Notification notification = sensitive("PASSWORD_RESET", Instant.now().minus(Duration.ofMinutes(5)));
+        when(repository.findById(1L)).thenReturn(Optional.of(notification));
+
+        dispatcher.dispatch(1L);
+
+        assertThat(sentMessages(1).getFirst().body()).isEqualTo("<p>enlace secreto</p>");
+        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.SENT);
+        assertThat(notification.getBody()).isEqualTo("[contenido omitido]");
+    }
+
+    @Test
+    void oldNonSensitiveNotificationIsStillSent() {
+        NotificationDispatcher dispatcher = newDispatcher();
+        Notification notification = sensitive("ROOM_REQUEST_RESOLVED", Instant.now().minus(Duration.ofDays(2)));
+        when(repository.findById(1L)).thenReturn(Optional.of(notification));
+
+        dispatcher.dispatch(1L);
+
+        sentMessages(1);
+        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.SENT);
+        assertThat(notification.getBody()).isEqualTo("<p>enlace secreto</p>");
+    }
+
+    private static Notification sensitive(String template, Instant createdAt) {
+        Notification notification = Notification.builder()
+                .id(1L).template(template).channel(NotificationChannel.EMAIL)
+                .recipient("docente@frc.utn.edu.ar").recipientName("Docente").subject("Asunto")
+                .body("<p>enlace secreto</p>").status(NotificationStatus.PENDING).idempotencyKey("k").build();
+        ReflectionTestUtils.setField(notification, "createdAt", createdAt);
+        return notification;
     }
 
     private NotificationDispatcher newDispatcher() {

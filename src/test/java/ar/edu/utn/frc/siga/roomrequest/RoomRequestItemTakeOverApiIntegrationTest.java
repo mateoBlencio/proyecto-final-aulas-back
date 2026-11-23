@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("POST /v1/room-requests/items/{id}/take-over (integración)")
 class RoomRequestItemTakeOverApiIntegrationTest extends AbstractIntegrationTest {
 
-    private static final String SUBSECRETARIA = "subsecretaria@frc.utn.edu.ar";
+    private static final String ADMINISTRADOR = "subsecretaria@frc.utn.edu.ar";
     private static final String BODY = "{\"reason\":\"lo resuelve subsecretaría\"}";
 
     @Autowired
@@ -358,15 +358,15 @@ class RoomRequestItemTakeOverApiIntegrationTest extends AbstractIntegrationTest 
         request.addItem(item);
         Instant now = Instant.now();
         if (building != null) {
-            item.deriveTo(building.getId(), SUBSECRETARIA, now);
+            item.deriveTo(building.getId(), ADMINISTRADOR, now);
         }
         switch (status) {
             case DERIVED_TO_BUILDING -> { }
-            case IN_EVALUATION, CANCELLED -> item.decide(status, SUBSECRETARIA, "motivo de prueba", now);
-            case NOTIFIED -> item.notifyTeacher(SUBSECRETARIA, now, deadline == null ? now.plus(Duration.ofDays(2)) : deadline);
+            case IN_EVALUATION, CANCELLED -> item.decide(status, ADMINISTRADOR, "motivo de prueba", now);
+            case NOTIFIED -> item.notifyTeacher(ADMINISTRADOR, now, deadline == null ? now.plus(Duration.ofDays(2)) : deadline);
             case RESOLVED -> {
-                item.notifyTeacher(SUBSECRETARIA, now, now.plus(Duration.ofDays(2)));
-                item.accept(SUBSECRETARIA, now);
+                item.notifyTeacher(ADMINISTRADOR, now, now.plus(Duration.ofDays(2)));
+                item.accept(ADMINISTRADOR, now);
             }
             default -> throw new IllegalArgumentException(status.name());
         }

@@ -1,0 +1,36 @@
+meta {
+  name: Cambiar mi contraseña
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/users/me/password
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "currentPassword": "AdminSiga2026!",
+    "newPassword": "una contraseña larga y segura"
+  }
+}
+
+docs {
+  POST /v1/users/me/password. Exige la contraseña actual y revoca todos los refresh tokens.
+  Devuelve una sesión nueva (mismo formato que el login). Los access tokens de otras
+  sesiones siguen valiendo hasta 20 minutos.
+  400 con errors.currentPassword si la actual no coincide; 400 con errors.newPassword si
+  incumple la política o es igual a la actual. 429 con Retry-After tras 5 fallos
+  (comparte contador con el login).
+}
+
+script:post-response {
+  if (res.body.accessToken) {
+    bru.setVar("accessToken", res.body.accessToken);
+  }
+  if (res.body.refreshToken) {
+    bru.setVar("refreshToken", res.body.refreshToken);
+  }
+}

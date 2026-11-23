@@ -28,7 +28,7 @@ params:query {
 
 docs {
   Cambios individuales (type=CHANGE) que componen una operación en lote,
-  paginados y ordenados por revisión descendente. Requiere rol SUBSECRETARIA.
+  paginados y ordenados por revisión descendente. Requiere rol ADMINISTRADOR.
   El operationId sale del campo operationId de las entradas type=OPERATION de
   GET /v1/audit. Página vacía si el operationId no existe.
   Los filtros actor (HUMAN | SYSTEM) y q (texto en la descripción) también aplican.
@@ -37,7 +37,7 @@ docs {
   (null si la entidad no tiene etiqueta o no se pudo resolver). Formatos:
   Asignación "Aula 101, Central · 04/03/2026", Ocurrencia "Álgebra 1K1 · 04/03/2026",
   Evento académico "Álgebra 1K1", Usuario (email), Asignación de rol
-  "SUBSECRETARIA de ana@frc.utn.edu.ar", Solicitud de aula "Solicitud de Juan Pérez".
+  "ADMINISTRADOR de ana@frc.utn.edu.ar", Solicitud de aula "Solicitud de Juan Pérez".
   En OPERATION y TRANSACTION (los items de la lista general) es siempre null.
 
   Cada CHANGE trae 'changes': diff por campo [{field, label, oldValue, newValue}] con label en español y valores formateados para una persona de
