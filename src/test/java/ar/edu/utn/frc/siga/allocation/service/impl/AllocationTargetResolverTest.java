@@ -458,6 +458,68 @@ class AllocationTargetResolverTest {
         assertThat(resolved.keySet()).containsExactly(principal, espejo);
     }
 
+    // ---------- roomSlot ----------
+
+    @Test
+    @DisplayName("resolveAll: Event con roomSlot=2 devuelve solo los espejos de ese orden")
+    void resolveAllEventFiltraPorRoomSlot() {
+        LocalDate d = LocalDate.now().plusDays(10);
+        OccurrenceSlotDto principal = slotForEvent(1L, EVENT_ID, d);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, d, 1L);
+        when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(principal, espejo));
+
+        assertThat(resolver.resolveAll(List.of(new AllocationTarget.Event(EVENT_ID, 2)), LocalDate.now()))
+                .containsExactly(espejo);
+        assertThat(resolver.resolveAll(List.of(new AllocationTarget.Event(EVENT_ID, 1)), LocalDate.now()))
+                .containsExactly(principal);
+        assertThat(resolver.resolveAll(List.of(new AllocationTarget.Event(EVENT_ID, 3)), LocalDate.now())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("resolveAll: Event con roomSlot null no filtra")
+    void resolveAllEventRoomSlotNullNoFiltra() {
+        LocalDate d = LocalDate.now().plusDays(10);
+        OccurrenceSlotDto principal = slotForEvent(1L, EVENT_ID, d);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, d, 1L);
+        when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(principal, espejo));
+
+        assertThat(resolver.resolveAll(List.of(new AllocationTarget.Event(EVENT_ID, null)), LocalDate.now()))
+                .containsExactly(principal, espejo);
+    }
+
+    @Test
+    @DisplayName("resolveAll: EventRange con roomSlot=2 devuelve solo los espejos de ese orden dentro del rango")
+    void resolveAllEventRangeFiltraPorRoomSlot() {
+        LocalDate from = LocalDate.now().plusDays(7);
+        realValidateRange();
+        OccurrenceSlotDto principal = slot(1L, from);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, from, 1L);
+        OccurrenceSlotDto espejoFueraDeRango = mirrorSlotForEvent(4L, EVENT_ID, from.plusDays(30), 3L);
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, from))
+                .thenReturn(List.of(principal, espejo, espejoFueraDeRango));
+
+        assertThat(resolver.resolveAll(
+                List.of(new AllocationTarget.EventRange(EVENT_ID, from, from.plusDays(14), 2)), LocalDate.now()))
+                .containsExactly(espejo);
+        assertThat(resolver.resolveAll(
+                List.of(new AllocationTarget.EventRange(EVENT_ID, from, from.plusDays(14), 1)), LocalDate.now()))
+                .containsExactly(principal);
+    }
+
+    @Test
+    @DisplayName("resolveAll: EventRange con roomSlot null no filtra")
+    void resolveAllEventRangeRoomSlotNullNoFiltra() {
+        LocalDate from = LocalDate.now().plusDays(7);
+        realValidateRange();
+        OccurrenceSlotDto principal = slot(1L, from);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, from, 1L);
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(principal, espejo));
+
+        assertThat(resolver.resolveAll(
+                List.of(new AllocationTarget.EventRange(EVENT_ID, from, from.plusDays(14), null)), LocalDate.now()))
+                .containsExactly(principal, espejo);
+    }
+
     // ---------- helpers ----------
 
     private static OccurrenceSlotDto mirrorSlotForEvent(long occurrenceId, long eventId, LocalDate date,

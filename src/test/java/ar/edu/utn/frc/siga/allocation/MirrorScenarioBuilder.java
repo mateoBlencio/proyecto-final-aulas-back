@@ -75,6 +75,30 @@ final class MirrorScenarioBuilder {
         return new Scenario(eventId, monday, principalId, principalRoom, mirrorIds, mirrorRooms);
     }
 
+    /** Una fecha de {@link WeeklyScenario}: principal y un espejo (roomSlot 2) con sus aulas. */
+    record WeekDay(LocalDate date, Long principalId, Long mirrorId, Classroom mirrorRoom) {}
+
+    record WeeklyScenario(Long eventId, Classroom principalRoom, List<WeekDay> days) {}
+
+    /** Clase semanal de {@code mirrorRoomsPerWeek.size()} fechas; cada fecha tiene un espejo en el aula indicada. */
+    WeeklyScenario buildWeekly(LocalDate monday, Classroom principalRoom, List<Classroom> mirrorRoomsPerWeek)
+            throws Exception {
+        int weeks = mirrorRoomsPerWeek.size();
+        var sc = testData.materiaYComision();
+        Long eventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), DayOfWeek.MONDAY,
+                LocalTime.of(18, 0), 90, monday, monday.plusWeeks(weeks - 1), 30);
+        List<WeekDay> days = new ArrayList<>();
+        for (var occurrence : occurrenceRepository.findByEvent_Id(eventId)) {
+            int index = days.size();
+            Long mirrorId = occurrenceService.createSimultaneous(occurrence.getId(), 1).getFirst();
+            assign(occurrence.getId(), principalRoom);
+            assign(mirrorId, mirrorRoomsPerWeek.get(index));
+            days.add(new WeekDay(occurrence.getDate(), occurrence.getId(), mirrorId, mirrorRoomsPerWeek.get(index)));
+        }
+        days.sort(java.util.Comparator.comparing(WeekDay::date));
+        return new WeeklyScenario(eventId, principalRoom, days);
+    }
+
     Scenario build(LocalDate monday, int... mirrorCapacities) throws Exception {
         Building building = testData.edificio();
         return build(monday, building, building, mirrorCapacities);

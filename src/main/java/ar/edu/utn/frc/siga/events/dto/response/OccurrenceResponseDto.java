@@ -17,6 +17,8 @@ public record OccurrenceResponseDto(
         LocalTime endTime,
         ReleaseReason releaseReason,
         String releaseNote,
-        Long previousClassroomId
+        Long previousClassroomId,
+        Integer roomSlot,
+        Long mirrorOfOccurrenceId
 ) {
 }

@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -75,7 +76,7 @@ class AllocationTargetResolver {
     private Map<Long, List<OccurrenceSlotDto>> collectSlotsByEvent(Collection<AllocationTarget> targets, LocalDate clampFrom) {
         Set<Long> eventIds = new LinkedHashSet<>();
         for (AllocationTarget target : targets) {
-            if (target instanceof AllocationTarget.Event(Long eventId)) {
+            if (target instanceof AllocationTarget.Event(Long eventId, Integer roomSlot)) {
                 eventIds.add(eventId);
             }
         }
@@ -97,12 +98,13 @@ class AllocationTargetResolver {
                 occurrences.forEach(validator::validateNotPast);
                 yield occurrences;
             }
-            case AllocationTarget.Event(Long eventId) -> slotsByEvent.getOrDefault(eventId, List.of())
+            case AllocationTarget.Event(Long eventId, Integer roomSlot) -> slotsByEvent.getOrDefault(eventId, List.of())
                     .stream()
                     .filter(o -> !principalsOnly || o.mirrorOfOccurrenceId() == null)
+                    .filter(o -> roomSlot == null || Objects.equals(o.roomSlot(), roomSlot))
                     .filter(o -> clampFrom == null || !o.isPast())
                     .toList();
-            case AllocationTarget.EventRange(Long eventId, LocalDate from, LocalDate to) -> {
+            case AllocationTarget.EventRange(Long eventId, LocalDate from, LocalDate to, Integer roomSlot) -> {
                 validator.validateRange(from, to);
                 // Se ignora el clamp del comando: el rango trae su propio 'desde'.
                 // Un 'desde' anterior a hoy se recorta a hoy sin error: el pasado no se toca.
@@ -111,6 +113,7 @@ class AllocationTargetResolver {
                 LocalDate effectiveFrom = from.isBefore(LocalDate.now()) ? LocalDate.now() : from;
                 yield occurrenceService.findSlotsByEvent(eventId, effectiveFrom).stream()
                         .filter(o -> !principalsOnly || o.mirrorOfOccurrenceId() == null)
+                        .filter(o -> roomSlot == null || Objects.equals(o.roomSlot(), roomSlot))
                         .filter(o -> to == null || !o.date().isAfter(to))
                         .filter(o -> !o.isPast())
                         .toList();

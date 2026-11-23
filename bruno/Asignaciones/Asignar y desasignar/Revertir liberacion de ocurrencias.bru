@@ -14,7 +14,8 @@ body:json {
   {
     "items": [
       { "occurrenceIds": [1041, 1042] },
-      { "eventId": 56, "from": "2026-04-07" }
+      { "eventId": 56, "from": "2026-04-07" },
+      { "eventId": 57, "from": "2026-04-07", "roomSlot": 2 }
     ]
   }
 }
@@ -23,6 +24,7 @@ docs {
   Devuelve a NEEDS_ROOM las ocurrencias liberadas del lote y sus espejos liberados, y limpia motivo
   y nota. Con el id de la principal alcanza: el back suma sus espejos. Un id de espejo enviado solo
   revierte solo ese espejo. Los espejos MIRROR_RETIRED (retirados por un pedido de aula) no vuelven.
+  roomSlot (opcional, solo con eventId) revierte solo esa aula de la clase (1 principal, 2+ espejos).
   No asigna aula; cada ocurrencia conserva su aula anterior.
   Respuesta 200: lista de ids revertidos, espejos incluidos.
   403 si alguna aula anterior (o actual), incluida la de un espejo, está fuera del alcance: rechaza

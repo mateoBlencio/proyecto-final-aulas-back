@@ -66,7 +66,8 @@ public class AllocationComposer {
             OccurrenceSlotDto slot = slotByOccurrenceId.get(allocation.getOccurrenceId());
             OccurrenceResponseDto occurrence = new OccurrenceResponseDto(
                     slot.occurrenceId(), slot.eventId(), slot.date(), slot.status(), slot.startTime(), slot.endTime(),
-                    slot.releaseReason(), slot.releaseNote(), slot.previousClassroomId());
+                    slot.releaseReason(), slot.releaseNote(), slot.previousClassroomId(), slot.roomSlot(),
+                    slot.mirrorOfOccurrenceId());
             AcademicEventResponseDto event = eventDtoById.get(slot.eventId());
             ClassroomResponseDto classroom = classroomsById.get(allocation.getClassroomId());
             AllocationGroupDto group = groupOf(allocation, groups.get(new GroupKey(slot.eventId(), slot.date())),

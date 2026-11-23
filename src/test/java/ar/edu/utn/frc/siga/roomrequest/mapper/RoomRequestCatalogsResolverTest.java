@@ -157,9 +157,9 @@ class RoomRequestCatalogsResolverTest {
                         .occurrenceId(20L).classroomId(1L).position(1).build())).build();
         RoomRequest.builder().id(2L).type(RoomRequestType.ONE_TIME_ROOM_CHANGE).build().addItem(other);
         when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
-                new OccurrenceResponseDto(10L, 50L, today.minusDays(7), OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null),
-                new OccurrenceResponseDto(11L, 50L, today, OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null),
-                new OccurrenceResponseDto(12L, 50L, today.plusDays(7), OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null)));
+                new OccurrenceResponseDto(10L, 50L, today.minusDays(7), OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null, null, null),
+                new OccurrenceResponseDto(11L, 50L, today, OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null, null, null),
+                new OccurrenceResponseDto(12L, 50L, today.plusDays(7), OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null, null, null)));
 
         Map<Long, Set<Long>> result = resolver.resolveFutureOccurrenceIdsByItemId(List.of(regular, other));
 
@@ -290,7 +290,7 @@ class RoomRequestCatalogsResolverTest {
     }
 
     private static OccurrenceResponseDto occurrence(Long id, Long eventId, LocalDate date) {
-        return new OccurrenceResponseDto(id, eventId, date, OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null);
+        return new OccurrenceResponseDto(id, eventId, date, OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null, null, null);
     }
 
     private static ClassroomResponseDto classroom(Long id, String buildingName) {
@@ -312,12 +312,12 @@ class RoomRequestCatalogsResolverTest {
         var needs = ar.edu.utn.frc.siga.events.model.OccurrenceStatus.NEEDS_ROOM;
         var virtual = ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS;
         when(academicEventService.findOccurrencesByEventIds(Set.of(55L))).thenReturn(List.of(
-                new OccurrenceResponseDto(1L, 55L, friday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0), virtual, null, null),
+                new OccurrenceResponseDto(1L, 55L, friday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0), virtual, null, null, null, null),
                 new OccurrenceResponseDto(2L, 55L, nextFriday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0),
-                        ar.edu.utn.frc.siga.events.model.ReleaseReason.CANCELLED, null, null),
-                new OccurrenceResponseDto(3L, 55L, nextFriday.plusWeeks(1), needs, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0), null, null, null),
+                        ar.edu.utn.frc.siga.events.model.ReleaseReason.CANCELLED, null, null, null, null),
+                new OccurrenceResponseDto(3L, 55L, nextFriday.plusWeeks(1), needs, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0), null, null, null, null, null),
                 new OccurrenceResponseDto(4L, 55L, friday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0),
-                        ar.edu.utn.frc.siga.events.model.ReleaseReason.MIRROR_RETIRED, null, null)));
+                        ar.edu.utn.frc.siga.events.model.ReleaseReason.MIRROR_RETIRED, null, null, null, null)));
         RoomRequestItem oneTime = RoomRequestItem.builder().id(10L).sourceRecurringEventId(55L).date(nextFriday).build();
         RoomRequest.builder().id(1L).type(RoomRequestType.ONE_TIME_ROOM_CHANGE).build().addItem(oneTime);
         RoomRequestItem regular = RoomRequestItem.builder().id(11L).sourceRecurringEventId(55L)

@@ -206,7 +206,7 @@ class RoomRequestOccurrenceResolverTest {
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90)).estimated(30).build();
         when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
         when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
-                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30), null, null, null)));
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30), null, null, null, null, null)));
 
         List<List<Long>> result = resolver.resolveOccurrencesBySlot(item, 1, false);
 
@@ -225,7 +225,7 @@ class RoomRequestOccurrenceResolverTest {
                 .date(date).startTime(LocalTime.of(18, 0)).duration(Duration.ofMinutes(60)).estimated(80).build();
         when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(901L));
         when(academicEventService.findOccurrencesByEventId(901L)).thenReturn(List.of(
-                new OccurrenceResponseDto(9001L, 901L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(18, 0), LocalTime.of(19, 0), null, null, null)));
+                new OccurrenceResponseDto(9001L, 901L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(18, 0), LocalTime.of(19, 0), null, null, null, null, null)));
 
         resolver.resolveOccurrencesBySlot(item, 1, false);
 
@@ -258,7 +258,7 @@ class RoomRequestOccurrenceResolverTest {
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90)).estimated(90).build();
         when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
         when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
-                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30), null, null, null)));
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30), null, null, null, null, null)));
         when(occurrenceService.createSimultaneous(9000L, 2)).thenReturn(List.of(9001L, 9002L));
 
         List<List<Long>> result = resolver.resolveOccurrencesBySlot(item, 3, false);
