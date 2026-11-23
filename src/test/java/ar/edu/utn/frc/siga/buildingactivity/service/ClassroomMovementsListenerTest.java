@@ -80,10 +80,10 @@ class ClassroomMovementsListenerTest {
     }
 
     @Test
-    @DisplayName("actor sin rol SUBSECRETARIA: no guarda, no manda mail y no consulta otros modulos")
+    @DisplayName("actor sin rol ADMINISTRADOR: no guarda, no manda mail y no consulta otros modulos")
     void ignoresActorWithoutSubsecretariaRole() {
         when(repository.existsByOperationId("op-1")).thenReturn(false);
-        when(userService.hasRole(ACTOR, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        when(userService.hasRole(ACTOR, SystemRole.ADMINISTRADOR)).thenReturn(false);
 
         listener.on(event("op-1", change(10L, 5L, 6L)));
 
@@ -268,7 +268,7 @@ class ClassroomMovementsListenerTest {
         stubClassrooms(classroom(5L, 101, CENTRAL, "Central"), classroom(6L, 102, CENTRAL, "Central"));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, CENTRAL))
                 .thenReturn(List.of(user("ana@utn.edu.ar", "Ana", "Perez"), user("dos@utn.edu.ar", "Dos", "Veces")));
-        when(userService.findByRoleForBuilding(SystemRole.SUBSECRETARIA, CENTRAL))
+        when(userService.findByRoleForBuilding(SystemRole.ADMINISTRADOR, CENTRAL))
                 .thenReturn(List.of(user("dos@utn.edu.ar", "Dos", "Veces"), user("sub@utn.edu.ar", "Sub", "Secre")));
 
         listener.on(sysacadEvent("op-9", change(10L, 5L, 6L)));
@@ -291,7 +291,7 @@ class ClassroomMovementsListenerTest {
         when(repository.existsByOperationId("op-9")).thenReturn(false);
         stubClassrooms(classroom(5L, 101, CENTRAL, "Central"), classroom(6L, 102, CENTRAL, "Central"));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, CENTRAL)).thenReturn(List.of());
-        when(userService.findByRoleForBuilding(SystemRole.SUBSECRETARIA, CENTRAL))
+        when(userService.findByRoleForBuilding(SystemRole.ADMINISTRADOR, CENTRAL))
                 .thenReturn(List.of(user("sub@utn.edu.ar", "Sub", "Secre")));
 
         listener.on(sysacadEvent("op-9", change(10L, 5L, 6L)));
@@ -312,8 +312,8 @@ class ClassroomMovementsListenerTest {
 
         listener.on(event("op-1", change(10L, 5L, 6L)));
 
-        verify(userService).hasRole(ACTOR, SystemRole.SUBSECRETARIA);
-        verify(userService, never()).findByRoleForBuilding(eq(SystemRole.SUBSECRETARIA), any());
+        verify(userService).hasRole(ACTOR, SystemRole.ADMINISTRADOR);
+        verify(userService, never()).findByRoleForBuilding(eq(SystemRole.ADMINISTRADOR), any());
         ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
         verify(notificationSender).send(captor.capture());
         assertThat(captor.getValue().recipients()).extracting(NotificationRecipient::email)
@@ -328,7 +328,7 @@ class ClassroomMovementsListenerTest {
 
     private void subsecretariaActs() {
         when(repository.existsByOperationId(any())).thenReturn(false);
-        when(userService.hasRole(ACTOR, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(ACTOR, SystemRole.ADMINISTRADOR)).thenReturn(true);
     }
 
     private void stubClassrooms(ClassroomResponseDto... classrooms) {

@@ -18,7 +18,7 @@ body:json {
 
 docs {
   POST /v1/dashboard/reports/{yyyy-MM}/regeneration. Permiso: PERM_DASHBOARD_SNAPSHOT_REGENERATE
-  (solo SUBSECRETARIA).
+  (solo ADMINISTRADOR).
   Recalcula un mes cerrado con los datos actuales (inscriptos, capacidades, feriados, parámetros).
   Las filas anteriores del mes se conservan con vigente = false; las nuevas llevan el motivo y
   el email de quien regeneró. Responde el informe nuevo, igual que GET /v1/dashboard/reports/{yyyy-MM}.

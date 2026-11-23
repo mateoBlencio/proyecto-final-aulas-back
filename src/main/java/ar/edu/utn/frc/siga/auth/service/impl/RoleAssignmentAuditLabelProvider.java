@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Label of a role assignment: "Subsecretaría de ana@frc.utn.edu.ar". Without the user, only the role. */
+/** Label of a role assignment: "Administrador de ana@frc.utn.edu.ar". Without the user, only the role. */
 @Component
 @RequiredArgsConstructor
 class RoleAssignmentAuditLabelProvider implements AuditLabelProvider {

@@ -86,7 +86,7 @@ class RevisionSummaryMigrationIntegrationTest {
 
         revision(REV_USERS);
         audit("usuario_aud", "id_usuario", 1, REV_USERS, ADD);
-        jdbc.update("INSERT INTO usuario_rol_aud (id_usuario_rol, id_usuario, rev, revtype, rol) VALUES (1, 1, ?, 0, 'SUBSECRETARIA')", REV_USERS);
+        jdbc.update("INSERT INTO usuario_rol_aud (id_usuario_rol, id_usuario, rev, revtype, rol) VALUES (1, 1, ?, 0, 'ADMINISTRADOR')", REV_USERS);
         jdbc.update("INSERT INTO usuario_rol_aud (id_usuario_rol, id_usuario, rev, revtype, rol) VALUES (2, 1, ?, 0, 'AUXILIAR_AULICO')", REV_USERS);
 
         revision(REV_SETTINGS);

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth.repository;
 
 import ar.edu.utn.frc.siga.auth.model.RefreshToken;
+import ar.edu.utn.frc.siga.auth.model.RevocationReason;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
+    @Query("select r.revocationReason from RefreshToken r where r.tokenHash = :tokenHash")
+    Optional<RevocationReason> findRevocationReason(@Param("tokenHash") String tokenHash);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update RefreshToken r set r.revoked = true, r.revokedAt = :revokedAt, "
             + "r.revocationReason = ar.edu.utn.frc.siga.auth.model.RevocationReason.ROTATION, "
@@ -22,9 +26,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
                             @Param("revokedAt") Instant revokedAt);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update RefreshToken r set r.revoked = true, r.revokedAt = :revokedAt, "
+    @Query("update RefreshToken r set r.revoked = true, r.revokedAt = coalesce(r.revokedAt, :revokedAt), "
             + "r.revocationReason = ar.edu.utn.frc.siga.auth.model.RevocationReason.CASCADE "
-            + "where r.user.id = :userId and r.revoked = false")
+            + "where r.user.id = :userId and (r.revoked = false "
+            + "or r.revocationReason = ar.edu.utn.frc.siga.auth.model.RevocationReason.ROTATION)")
     int revokeAllByUserId(@Param("userId") Long userId, @Param("revokedAt") Instant revokedAt);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

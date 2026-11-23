@@ -59,12 +59,17 @@ class AuditOperationCoverageTest {
             Map.entry("RoomRequestSuggestionStore#onSettingChanged", "only updates the in-memory suggestion cache TTL"),
             Map.entry("DirectEventSuggestionStore#onSettingChanged", "only updates the in-memory suggestion cache TTL"),
             Map.entry("RefreshTokenServiceImpl#issue", "refresh tokens are not @Audited"),
+            Map.entry("RefreshTokenServiceImpl#issueForLogin", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#refresh", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revoke", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revokeAllByUserId", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#purgeExpired", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenPurgeScheduler#purgeExpired",
-                    "only delegates to RefreshTokenServiceImpl.purgeExpired; refresh tokens are not @Audited"),
+                    "only delegates to RefreshTokenServiceImpl.purgeExpired and PasswordResetServiceImpl.purgeExpired; "
+                            + "refresh tokens and reset tokens are not @Audited"),
+            Map.entry("PasswordResetServiceImpl#issueResetLink",
+                    "writes no audited entities: reset tokens and notifications are not @Audited"),
+            Map.entry("PasswordResetServiceImpl#purgeExpired", "reset tokens are not @Audited"),
             Map.entry("AuditArchiveScheduler#archive",
                     "only delegates to AuditArchiveServiceImpl.archive, which carries the annotation"),
             Map.entry("AuditArchiveRepository#archiveBatch",
@@ -164,7 +169,7 @@ class AuditOperationCoverageTest {
     @DisplayName("ningún texto base de @AuditOperation contiene el nombre de una constante de enum en mayúsculas")
     void noBaseTextContainsAnEnumConstantName() {
         Set<String> constants = enumConstantNames();
-        assertThat(constants).contains("VIRTUAL_CLASS", "SUBSECRETARIA", "NEW");
+        assertThat(constants).contains("VIRTUAL_CLASS", "ADMINISTRADOR", "NEW");
 
         Map<String, String> offending = new TreeMap<>();
         auditOperations().forEach((key, operation) -> {

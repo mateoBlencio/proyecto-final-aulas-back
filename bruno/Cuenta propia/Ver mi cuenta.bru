@@ -1,0 +1,17 @@
+meta {
+  name: Ver mi cuenta
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/users/me
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/users/me. Cualquier usuario autenticado, sin permiso específico.
+  Devuelve datos del usuario, sus asignaciones de rol y los permisos efectivos:
+  permissions[] con { permission, allBuildings, buildingIds }.
+}

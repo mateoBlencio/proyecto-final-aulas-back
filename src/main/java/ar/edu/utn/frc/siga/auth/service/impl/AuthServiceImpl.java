@@ -74,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmailAndEnabledTrue(email)
                 .orElseThrow(InvalidCredentialsException::new);
 
-        return buildTokenResponse(user, refreshTokenService.issue(user));
+        return buildTokenResponse(user, refreshTokenService.issueForLogin(user, securityUser.getPassword()));
     }
 
     // noRollbackFor: this transaction wraps RefreshTokenService.refresh, so it must not roll back either
@@ -91,6 +91,11 @@ public class AuthServiceImpl implements AuthService {
     public void logout(RefreshTokenRequest request) {
         refreshTokenService.revoke(request.refreshToken());
         log.info("Logout exitoso");
+    }
+
+    @Override
+    public TokenResponse startSession(User user) {
+        return buildTokenResponse(user, refreshTokenService.issue(user));
     }
 
     private TokenResponse buildTokenResponse(User user, IssuedRefreshToken refreshToken) {

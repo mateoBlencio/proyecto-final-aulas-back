@@ -1,0 +1,26 @@
+meta {
+  name: Olvidé mi contraseña
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/auth/forgot-password
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "admin@frc.utn.edu.ar"
+  }
+}
+
+docs {
+  POST /auth/forgot-password. Público.
+  Responde 202 sin cuerpo exista o no el correo. Si el usuario existe y está
+  habilitado, manda un enlace de un solo uso que vence a los 30 minutos
+  (FRONTEND_BASE_URL + /restablecer-contrasena#token=...). 400 con errors.email
+  si el correo está vacío, mal formado o supera 150 caracteres. 429 con
+  Retry-After tras 3 pedidos seguidos del mismo correo e ip (20 por ip) en una hora.
+}

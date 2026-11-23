@@ -24,7 +24,7 @@ docs {
   Actualiza el valor de un setting. Valida tipo y cotas server-side (400 si el
   valor está fuera de rango o no es del tipo esperado), audita el cambio con
   Envers y aplica con efecto inmediato (sin reiniciar). 404 si la clave no
-  existe. Requiere rol SUBSECRETARIA.
+  existe. Requiere rol ADMINISTRADOR.
 
   Para desactivar una constraint SOFT del optimizer, poné su peso en 0
   (Timefold la saltea): p.ej. key optimizer.weights.overcrowding, value "0".

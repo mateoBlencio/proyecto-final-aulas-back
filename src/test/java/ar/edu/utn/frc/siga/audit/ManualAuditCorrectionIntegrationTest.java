@@ -739,14 +739,14 @@ class ManualAuditCorrectionIntegrationTest extends AbstractIntegrationTest {
         long id = IDS.incrementAndGet();
         seededRoles.add(id);
         seed(j -> j.update("INSERT INTO usuario_rol (id_usuario_rol, id_usuario, rol, tipo_alcance) "
-                + "VALUES (?, ?, 'SUBSECRETARIA', 'GLOBAL')", id, id));
+                + "VALUES (?, ?, 'ADMINISTRADOR', 'GLOBAL')", id, id));
         int rev = openRevision("rol");
 
         assertThat(register(rev, "usuario_rol_aud", id, 0)).isEqualTo(1);
 
         Map<String, Object> aud = jdbc.queryForMap("SELECT revtype, id_usuario, rol, tipo_alcance "
                 + "FROM usuario_rol_aud WHERE rev = ? AND id_usuario_rol = ?", rev, id);
-        assertThat(aud).containsEntry("rol", "SUBSECRETARIA").containsEntry("tipo_alcance", "GLOBAL");
+        assertThat(aud).containsEntry("rol", "ADMINISTRADOR").containsEntry("tipo_alcance", "GLOBAL");
         assertThat(((Number) aud.get("id_usuario")).longValue()).isEqualTo(id);
         assertThat(summaryCount(rev, "usuario_rol_aud", 0)).isEqualTo(1);
     }

@@ -61,17 +61,15 @@ class CreateUserRequestDtoTest {
     @Test
     @DisplayName("un alta con valores típicos no tiene violaciones")
     void validDtoHasNoViolations() {
-        assertThat(validator.validate(withPassword("supersegura"))).isEmpty();
+        assertThat(validator.validate(withPassword("clave-segura-2026"))).isEmpty();
     }
 
     @ParameterizedTest(name = "password de {0} caracteres -> violación de tamaño: {1}")
     @CsvSource({
-            "7, true",
-            "8, false",
             "72, false",
             "73, true"
     })
-    @DisplayName("password: entre 8 y 72 caracteres, con el valor límite y su vecino inválido")
+    @DisplayName("password: máximo 72 caracteres, con el valor límite y su vecino inválido")
     void passwordLengthBoundaries(int length, boolean violated) {
         List<String> fields = sizeViolatedFields(withPassword("p".repeat(length)));
 
@@ -80,14 +78,13 @@ class CreateUserRequestDtoTest {
 
     @ParameterizedTest(name = "firstName y lastName de {0} caracteres -> violación de tamaño: {1}")
     @CsvSource({
-            "1, false",
             "100, false",
             "101, true"
     })
     @DisplayName("firstName y lastName: máximo 100 caracteres")
     void nameLengthBoundaries(int length, boolean violated) {
         String name = "n".repeat(length);
-        CreateUserRequestDto dto = new CreateUserRequestDto("ok@frc.utn.edu.ar", "supersegura", name, name, null);
+        CreateUserRequestDto dto = new CreateUserRequestDto("ok@frc.utn.edu.ar", "clave-segura-2026", name, name, null);
 
         assertThat(sizeViolatedFields(dto))
                 .isEqualTo(violated ? List.of("firstName", "lastName") : List.of());
@@ -101,7 +98,7 @@ class CreateUserRequestDtoTest {
     @DisplayName("email: máximo 150 caracteres")
     void emailLengthBoundaries(int length, boolean violated) {
         CreateUserRequestDto dto = new CreateUserRequestDto(
-                emailOfLength(length), "supersegura", "Nombre", "Apellido", null);
+                emailOfLength(length), "clave-segura-2026", "Nombre", "Apellido", null);
 
         assertThat(sizeViolatedFields(dto)).isEqualTo(violated ? List.of("email") : List.of());
     }

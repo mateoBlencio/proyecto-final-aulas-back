@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.notification.internal.model;
 
 import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import ar.edu.utn.frc.siga.notification.api.NotificationChannel;
+import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -30,6 +31,7 @@ import java.time.Instant;
 public class Notification extends TimestampedEntity {
 
     private static final int MAX_ERROR_LENGTH = 500;
+    private static final String REDACTED_BODY = "[contenido omitido]";
 
     @EqualsAndHashCode.Include
     @Id
@@ -94,11 +96,13 @@ public class Notification extends TimestampedEntity {
         this.status = NotificationStatus.SENT;
         this.sentAt = now;
         this.lastError = null;
+        redactIfSensitive();
     }
 
     public void markDiscarded(String reason) {
         this.status = NotificationStatus.DISCARDED;
         this.lastError = truncate(reason);
+        redactIfSensitive();
     }
 
     public void registerFailure(String error, Duration backoff, int maxAttempts) {
@@ -107,8 +111,15 @@ public class Notification extends TimestampedEntity {
         if (this.attempts >= maxAttempts) {
             this.status = NotificationStatus.FAILED;
             this.nextAttemptAt = null;
+            redactIfSensitive();
         } else {
             this.nextAttemptAt = Instant.now().plus(backoff);
+        }
+    }
+
+    private void redactIfSensitive() {
+        if (NotificationTemplate.isSensitive(template)) {
+            this.body = REDACTED_BODY;
         }
     }
 

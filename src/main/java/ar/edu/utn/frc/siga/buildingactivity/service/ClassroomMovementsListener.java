@@ -63,7 +63,7 @@ class ClassroomMovementsListener {
     void on(ClassroomMovements event) {
         if (repository.existsByOperationId(event.operationId())) return;
         if (event.source() != AllocationSource.SYSACAD
-                && !userService.hasRole(event.actor(), SystemRole.SUBSECRETARIA)) return;
+                && !userService.hasRole(event.actor(), SystemRole.ADMINISTRADOR)) return;
 
         Map<Long, ClassroomRef> classrooms = classroomsOf(event.changes());
         Map<Long, String> labels = labelsOf(event.changes());
@@ -106,7 +106,7 @@ class ClassroomMovementsListener {
         userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId)
                 .forEach(user -> recipientsByEmail.putIfAbsent(user.email(), toRecipient(user)));
         if (directInSysacad) {
-            userService.findByRoleForBuilding(SystemRole.SUBSECRETARIA, buildingId)
+            userService.findByRoleForBuilding(SystemRole.ADMINISTRADOR, buildingId)
                     .forEach(user -> recipientsByEmail.putIfAbsent(user.email(), toRecipient(user)));
         }
         List<NotificationRecipient> recipients = List.copyOf(recipientsByEmail.values());

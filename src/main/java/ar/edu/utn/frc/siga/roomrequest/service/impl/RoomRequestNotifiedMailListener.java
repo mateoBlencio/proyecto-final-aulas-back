@@ -81,7 +81,7 @@ class RoomRequestNotifiedMailListener {
 
     /** Todas las subsecretarias habilitadas menos el actor, que ya va en copia. */
     private List<String> subsecretariaBccExcluding(String actor) {
-        return userService.findByRole(SystemRole.SUBSECRETARIA).stream()
+        return userService.findByRole(SystemRole.ADMINISTRADOR).stream()
                 .map(UserResponseDto::email)
                 .filter(email -> !email.equalsIgnoreCase(actor))
                 .toList();

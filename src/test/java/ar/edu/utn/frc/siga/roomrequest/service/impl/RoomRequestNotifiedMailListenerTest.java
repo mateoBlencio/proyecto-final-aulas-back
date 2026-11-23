@@ -106,7 +106,7 @@ class RoomRequestNotifiedMailListenerTest {
         RoomRequestItem item = item(null);
         stubItem(item);
         when(composer.composeDetail(item)).thenReturn(detail());
-        when(userService.findByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(
+        when(userService.findByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(
                 user(1L, "subsecretaria1@frc.utn.edu.ar"), user(2L, "subsecretaria2@frc.utn.edu.ar")));
 
         listener.on(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));
@@ -122,7 +122,7 @@ class RoomRequestNotifiedMailListenerTest {
         RoomRequestItem item = item(null);
         stubItem(item);
         when(composer.composeDetail(item)).thenReturn(detail());
-        when(userService.findByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(
+        when(userService.findByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(
                 user(1L, "subsecretaria@frc.utn.edu.ar"), user(2L, "otra@frc.utn.edu.ar")));
 
         listener.on(new RoomRequestItemNotified(1L, 1, "Subsecretaria@FRC.utn.edu.ar"));
@@ -138,7 +138,7 @@ class RoomRequestNotifiedMailListenerTest {
         RoomRequestItem item = item(null);
         stubItem(item);
         when(composer.composeDetail(item)).thenReturn(detail());
-        when(userService.findByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of());
+        when(userService.findByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of());
 
         listener.on(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));
 
@@ -153,7 +153,7 @@ class RoomRequestNotifiedMailListenerTest {
         RoomRequestItem item = item(null);
         stubItem(item);
         when(composer.composeDetail(item)).thenReturn(detail());
-        when(userService.findByRole(SystemRole.SUBSECRETARIA))
+        when(userService.findByRole(SystemRole.ADMINISTRADOR))
                 .thenReturn(List.of(user(1L, "subsecretaria@frc.utn.edu.ar")));
 
         listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"));
@@ -169,7 +169,7 @@ class RoomRequestNotifiedMailListenerTest {
         when(composer.composeDetail(item)).thenReturn(detail());
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 7L))
                 .thenReturn(List.of(user(1L, "auxiliar@frc.utn.edu.ar")));
-        when(userService.findByRole(SystemRole.SUBSECRETARIA))
+        when(userService.findByRole(SystemRole.ADMINISTRADOR))
                 .thenReturn(List.of(user(2L, "subsecretaria@frc.utn.edu.ar")));
 
         listener.on(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));

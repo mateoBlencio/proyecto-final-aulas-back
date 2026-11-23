@@ -46,7 +46,7 @@ class AcademicPeriodUpdateApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("SUBSECRETARIA setea el receso en el ANUAL y sincroniza 1C/2C")
+    @DisplayName("ADMINISTRADOR setea el receso en el ANUAL y sincroniza 1C/2C")
     void subsecretariaSetsRecess() throws Exception {
         Long annualId = periodId(TermType.ANUAL);
 

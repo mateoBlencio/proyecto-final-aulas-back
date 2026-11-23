@@ -5,8 +5,6 @@ import ar.edu.utn.frc.siga.auth.config.LoginRateLimitProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,35 +26,15 @@ public class LoginRateLimiter {
     // address) and ip alone with a higher cap (so one address cannot spray many emails). A third counter
     // per email never blocks: it only logs a WARN past a threshold, to detect distributed brute force.
     private static String emailKey(String email, String ip) {
-        return "e:" + AuthDomainProperties.normalizeEmail(email) + "|" + normalizeIp(ip);
+        return "e:" + AuthDomainProperties.normalizeEmail(email) + "|" + ClientIps.normalize(ip);
     }
 
     private static String ipKey(String ip) {
-        return "i:" + normalizeIp(ip);
+        return "i:" + ClientIps.normalize(ip);
     }
 
     private static String alertKey(String email) {
         return "a:" + AuthDomainProperties.normalizeEmail(email);
-    }
-
-    // IPv6 clients usually own a whole /64, so rotating the lower 64 bits must not evade the counter
-    private static String normalizeIp(String ip) {
-        if (ip == null || !ip.contains(":")) {
-            return ip;
-        }
-        try {
-            byte[] bytes = InetAddress.getByName(ip).getAddress();
-            if (bytes.length != 16) {
-                return ip;
-            }
-            StringBuilder prefix = new StringBuilder("v6:");
-            for (int i = 0; i < 8; i++) {
-                prefix.append(String.format("%02x", bytes[i]));
-            }
-            return prefix.append("/64").toString();
-        } catch (UnknownHostException e) {
-            return ip;
-        }
     }
 
     public boolean isRateLimited(String email, String ip, Instant now) {
