@@ -60,7 +60,7 @@ class CommissionSyncServiceTest {
         SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
         when(catalogReader.findCommissions()).thenReturn(List.of(row));
         when(catalogReader.findSubjectCommissions())
-                .thenReturn(List.of(new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30)));
+                .thenReturn(List.of(new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30, null)));
         when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(2);
 
         service.sync(catalogReader);
@@ -69,7 +69,7 @@ class CommissionSyncServiceTest {
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
         verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
-                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30));
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null));
         verify(syncStateService).recordSuccess(SysacadView.COMISIONES, 2);
     }
 
@@ -79,9 +79,9 @@ class CommissionSyncServiceTest {
         SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
         when(catalogReader.findCommissions()).thenReturn(List.of(row));
         when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
-                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 12),
-                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30),
-                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 7)));
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 12, null),
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30, null),
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 7, null)));
         when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
@@ -90,7 +90,7 @@ class CommissionSyncServiceTest {
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
         verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
-                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30));
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, null));
     }
 
     @Test
@@ -101,9 +101,9 @@ class CommissionSyncServiceTest {
                 new SysacadCommissionDto("101", 1, 2008, 55, 2026, 1),
                 new SysacadCommissionDto("101", 2, 2024, 55, 2026, 1)));
         when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
-                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 12),
-                new SysacadSubjectCommissionDto("101", 1, 2008, 55, 30),
-                new SysacadSubjectCommissionDto("101", 2, 2024, 55, 7)));
+                new SysacadSubjectCommissionDto("101", 1, 2024, 55, 12, null),
+                new SysacadSubjectCommissionDto("101", 1, 2008, 55, 30, null),
+                new SysacadSubjectCommissionDto("101", 2, 2024, 55, 7, null)));
         when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(3);
 
         service.sync(catalogReader);
@@ -112,9 +112,9 @@ class CommissionSyncServiceTest {
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
         verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
-                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 12),
-                new CommissionSyncCommand("101", 1, 2008, 55, 2026, 30),
-                new CommissionSyncCommand("101", 2, 2024, 55, 2026, 7));
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 12, null),
+                new CommissionSyncCommand("101", 1, 2008, 55, 2026, 30, null),
+                new CommissionSyncCommand("101", 2, 2024, 55, 2026, 7, null));
     }
 
     @Test
@@ -123,8 +123,8 @@ class CommissionSyncServiceTest {
         when(catalogReader.findCommissions()).thenReturn(List.of(
                 new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1)));
         when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
-                new SysacadSubjectCommissionDto("101", 1, 2008, 55, 30),
-                new SysacadSubjectCommissionDto("101", 2, 2024, 55, 7)));
+                new SysacadSubjectCommissionDto("101", 1, 2008, 55, 30, null),
+                new SysacadSubjectCommissionDto("101", 2, 2024, 55, 7, null)));
         when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
@@ -133,7 +133,7 @@ class CommissionSyncServiceTest {
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
         verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
-                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null));
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null));
     }
 
     @Test
@@ -150,7 +150,25 @@ class CommissionSyncServiceTest {
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
         verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
-                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null));
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null, null));
+    }
+
+    @Test
+    @DisplayName("sync: copia el cuatrimestre de la pareja curso+materia al comando")
+    void syncPropagatesSemesterToCommand() {
+        SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
+        when(catalogReader.findCommissions()).thenReturn(List.of(row));
+        when(catalogReader.findSubjectCommissions())
+                .thenReturn(List.of(new SysacadSubjectCommissionDto("101", 1, 2024, 55, 30, 2)));
+        when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
+        verify(commissionService).syncCommissions(captor.capture(), eq(50));
+        assertThat(captor.getValue()).containsExactly(
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30, 2));
     }
 
     @Test

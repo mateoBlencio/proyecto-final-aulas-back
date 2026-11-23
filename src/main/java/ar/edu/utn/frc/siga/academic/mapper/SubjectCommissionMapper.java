@@ -13,6 +13,7 @@ public interface SubjectCommissionMapper {
     @Mapping(target = "subject", source = "subject")
     @Mapping(target = "commissionId", source = "commission.id")
     @Mapping(target = "commission", source = "commission")
+    @Mapping(target = "term", expression = "java(subjectCommission.termLabel())")
     @Mapping(target = "enabled", expression = "java(subjectCommission.isActive())")
     @Mapping(target = "unavailableReason", expression = "java(subjectCommission.unavailableReason())")
     SubjectCommissionResponseDto toDto(SubjectCommission subjectCommission);
